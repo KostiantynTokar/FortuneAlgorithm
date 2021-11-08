@@ -3,14 +3,36 @@
 #include <tuple>
 #include <limits>
 #include <cassert>
-#include <iostream>
+
+#include <pybind11/pybind11.h>
+#include <pybind11/embed.h>
+#include <pybind11/stl.h>
+#include <pybind11/eval.h>
 
 using namespace std;
+namespace py = pybind11;
+using namespace py::literals;
 
 struct Point
 {
 	double x;
 	double y;
+};
+
+struct DoublyConnectedEdgeList
+{
+	struct Edge
+	{
+		size_t a;
+		size_t b;
+		bool aEmpty = true;
+		bool bEmpty = true;
+		size_t site1;
+		size_t site2;
+		bool isDirLeft; // from -inf to vertex.
+	};
+	vector<Edge> edges; // up to n^2 elements?
+	vector<Point> vertices;
 };
 
 // Returns x-coordinate of left intersection if site1.x <= site2.x and x-coordinate of right intersection otherwise.
@@ -39,7 +61,7 @@ double parabolasIntersectionX(const double sweepLineY, const Point& site1, const
 constexpr double parabolaY(const double sweepLineY, const Point& site, const double x)
 {
 	const auto p = site.y - sweepLineY;
-	return x * x / (2 * p) - (site.x * x) / p + (site.x * site.x) / (2 * p) + p / 2;
+	return x * x / (2 * p) - (site.x * x) / p + (site.x * site.x) / (2 * p) + p / 2 + sweepLineY;
 }
 
 struct BeachLine
@@ -53,6 +75,7 @@ struct BeachLine
 		Node* right;
 		size_t p;
 		size_t q;
+		ptrdiff_t edgepq = -1;
 		ptrdiff_t circleEventId; // -1 if no circle event is connected to this leaf.
 		signed char balance; // Difference in height between right subtree and left subtree.
 
@@ -248,6 +271,7 @@ struct BeachLine
 		}
 		insteadLower->parent = lowerNode->parent;
 		delete lowerNode;
+		delete node;
 
 		auto parent = aboveLower->parent;
 		auto needRebalance = rebalanceSubTree(aboveLower, parent);
@@ -643,21 +667,70 @@ bool isIntersectionBelow(const double y, const Point& a1, const Point& a2, const
 	return numer / denom <= y;
 }
 
-struct Edge
+bool isConvergent(const double y, const Point& a1, const Point& a2, const Point& b1, const Point& b2)
 {
-	size_t i;
-	size_t j;
-};
+	const auto leftIntersectionX = parabolasIntersectionX(y, a1, a2);
+	const auto leftIntersectionY = parabolaY(y, a1, leftIntersectionX);
 
-struct VoronoiDiagram
-{
-	vector<Point> vertices;
-	vector<Edge> edges;
-};
+	const auto rightIntersectionX = parabolasIntersectionX(y, b1, b2);
+	const auto rightIntersectionY = parabolaY(y, b1, rightIntersectionX);
 
-VoronoiDiagram fortune(vector<Point> points)
+	// y = m * x + f
+	const auto m1 = (a1.x - a2.x) / (a2.y - a1.y);
+	const auto f1 = -m1 * (a1.x + a2.x) / 2 + (a1.y + a2.y) / 2;
+
+	const auto m2 = (b1.x - b2.x) / (b2.y - b1.y);
+	const auto f2 = -m2 * (b1.x + b2.x) / 2 + (b1.y + b2.y) / 2;
+
+	// TODO: isClose
+	if (m1 == m2)
+	{
+		return false;
+	}
+	const auto intersectionX = (f2 - f1) / (m1 - m2);
+	const auto intersectionY = m1 * intersectionX + f1;
+
+	if (a1.x <= a2.x)
+	{
+		// It is left intersection.
+		// It goes to the left.
+		if (intersectionX > leftIntersectionX)
+			return false;
+	}
+	else
+	{
+		// Intersection goes to the right.
+		if (intersectionX < leftIntersectionX)
+			return false;
+	}
+
+	if (b1.x <= b2.x)
+	{
+		// It is left intersection.
+		// It goes to the left.
+		if (intersectionX > rightIntersectionX)
+			return false;
+	}
+	else
+	{
+		// Intersection goes to the right.
+		if (intersectionX < rightIntersectionX)
+			return false;
+	}
+
+#ifdef _DEBUG
+	const auto site1 = a1;
+	const auto site2 = a2;
+	const auto site3 = ((b1.x == a1.x && b1.y == a1.y) || (b1.x == a2.x && b1.y == a2.y)) ? b2 : b1;
+	assert(y >= get<0>(circleBottomPoint(site1, site2, site3)));
+#endif
+
+	return true;
+}
+
+DoublyConnectedEdgeList fortune(vector<Point> points)
 {
-	auto res = VoronoiDiagram{};
+	auto dcel = DoublyConnectedEdgeList{};
 
 	sort(begin(points), end(points), [](const auto& a, const auto& b) { return a.y > b.y; });
 	auto queue = PriorityQueue{ points };
@@ -670,7 +743,7 @@ VoronoiDiagram fortune(vector<Point> points)
 	{
 		if(const auto leftleftIntersection = get<0>(beachLine.findIntersectionWithLeftLeaf(left)))
 		{
-			if (isIntersectionBelow(y, points[leftleftIntersection->p], points[leftleftIntersection->q], points[leftIntersection->p], points[leftIntersection->q]))
+			if(isConvergent(y, points[leftleftIntersection->p], points[leftleftIntersection->q], points[leftIntersection->p], points[leftIntersection->q]))
 			{
 				const auto leftleftSite = leftleftIntersection->p == left->p ? leftleftIntersection->q : leftleftIntersection->p;
 				assert(leftleftSite != left->p && leftleftSite != innerLeft->p && left->p != innerLeft->p);
@@ -680,7 +753,7 @@ VoronoiDiagram fortune(vector<Point> points)
 		}
 		if (const auto rightrightIntersection = get<0>(beachLine.findIntersectionWithRightLeaf(right)))
 		{
-			if (isIntersectionBelow(y, points[rightIntersection->p], points[rightIntersection->q], points[rightrightIntersection->p], points[rightrightIntersection->q]))
+			if(isConvergent(y, points[rightIntersection->p], points[rightIntersection->q], points[rightrightIntersection->p], points[rightrightIntersection->q]))
 			{
 				const auto rightrightSite = rightrightIntersection->p == right->p ? rightrightIntersection->q : rightrightIntersection->p;
 				assert(rightrightSite != right->p && rightrightSite != innerRight->p && right->p != innerRight->p);
@@ -699,25 +772,30 @@ VoronoiDiagram fortune(vector<Point> points)
 	while (!queue.empty())
 	{
 		auto ev = queue.pop();
-		cout << ev.y << "\n";
 		switch (ev.type)
 		{
-		break;  case Event::Type::site:
+		break; case Event::Type::site:
 		{
 			const auto [eventId, left, leftCentral, central, centralRight, right] = beachLine.insertArc();
 			if (eventId != -1)
 			{
 				queue.removeById(eventId);
 			}
+			const auto e = DoublyConnectedEdgeList::Edge{ .site1 = central->p, .site2 = left->p };
+			dcel.edges.push_back(e);
+			centralRight->edgepq = leftCentral->edgepq = dcel.edges.size() - 1;
 			createCircleEvents(ev.y, left, leftCentral, central, central, centralRight, right);
 		}
 		break; case Event::Type::circle:
 		{
+			dcel.vertices.push_back(ev.center);
 			const auto arcToRemove = ev.leaf;
 			const auto left = beachLine.findLeafToLeft(arcToRemove);
 			const auto right = beachLine.findLeafToRight(arcToRemove);
 			assert(left != nullptr);
 			assert(right != nullptr);
+			assert(arcToRemove->p != left->p);
+			assert(arcToRemove->p != right->p);
 			if (left->circleEventId != -1)
 			{
 				queue.removeById(left->circleEventId);
@@ -728,17 +806,210 @@ VoronoiDiagram fortune(vector<Point> points)
 				queue.removeById(right->circleEventId);
 				right->circleEventId = -1;
 			}
+
+			// TODO: findLeaf and findIntersection.
+			const auto leftIntersection = get<0>(beachLine.findIntersectionWithRightLeaf(left));
+			const auto rightIntersection = get<0>(beachLine.findIntersectionWithLeftLeaf(right));
+			assert(leftIntersection->edgepq != -1);
+			assert(rightIntersection->edgepq != -1);
+
+			auto s1 = dcel.edges[leftIntersection->edgepq].site1 = left->p;
+			auto s2 = dcel.edges[leftIntersection->edgepq].site2 = arcToRemove->p;
+			if (dcel.edges[leftIntersection->edgepq].aEmpty)
+			{
+				dcel.edges[leftIntersection->edgepq].a = dcel.vertices.size() - 1;
+				dcel.edges[leftIntersection->edgepq].aEmpty = false;
+			}
+			else
+			{
+				dcel.edges[leftIntersection->edgepq].b = dcel.vertices.size() - 1;
+				dcel.edges[leftIntersection->edgepq].bEmpty = false;
+			}
+
+			if (points[s1].x < points[s2].x && points[s1].y < points[s2].y)
+			{
+				dcel.edges[leftIntersection->edgepq].isDirLeft = true;
+			}
+			else if (points[s1].x < points[s2].x && points[s1].y > points[s2].y)
+			{
+				dcel.edges[leftIntersection->edgepq].isDirLeft = false;
+			}
+			else if (points[s1].x > points[s2].x && points[s1].y < points[s2].y)
+			{
+				dcel.edges[leftIntersection->edgepq].isDirLeft = false;
+			}
+			else if (points[s1].x > points[s2].x && points[s1].y > points[s2].y)
+			{
+				dcel.edges[leftIntersection->edgepq].isDirLeft = true;
+			}
+
+			s1 = dcel.edges[rightIntersection->edgepq].site1 = arcToRemove->p;
+			s2 = dcel.edges[rightIntersection->edgepq].site2 = right->p;
+			if (dcel.edges[rightIntersection->edgepq].aEmpty)
+			{
+				dcel.edges[rightIntersection->edgepq].a = dcel.vertices.size() - 1;
+				dcel.edges[rightIntersection->edgepq].aEmpty = false;
+			}
+			else
+			{
+				dcel.edges[rightIntersection->edgepq].b = dcel.vertices.size() - 1;
+				dcel.edges[rightIntersection->edgepq].bEmpty = false;
+			}
+
+			if (points[s1].x < points[s2].x && points[s1].y < points[s2].y)
+			{
+				dcel.edges[rightIntersection->edgepq].isDirLeft = true;
+			}
+			else if (points[s1].x < points[s2].x && points[s1].y > points[s2].y)
+			{
+				dcel.edges[rightIntersection->edgepq].isDirLeft = false;
+			}
+			else if (points[s1].x > points[s2].x && points[s1].y < points[s2].y)
+			{
+				dcel.edges[rightIntersection->edgepq].isDirLeft = false;
+			}
+			else if (points[s1].x > points[s2].x && points[s1].y > points[s2].y)
+			{
+				dcel.edges[rightIntersection->edgepq].isDirLeft = true;
+			}
+
 			const auto intersection = beachLine.removeArc(arcToRemove);
+
+			auto e = DoublyConnectedEdgeList::Edge{
+				.a = dcel.vertices.size() - 1, 
+				.aEmpty = false,
+				.site1 = left->p, .site2 = right->p
+			};
+			if (points[e.site1].x < points[e.site2].x && points[e.site1].y < points[e.site2].y)
+			{
+				e.isDirLeft = false;
+			}
+			else if (points[e.site1].x < points[e.site2].x && points[e.site1].y > points[e.site2].y)
+			{
+				e.isDirLeft = true;
+			}
+			else if (points[e.site1].x > points[e.site2].x && points[e.site1].y < points[e.site2].y)
+			{
+				e.isDirLeft = true;
+			}
+			else if (points[e.site1].x > points[e.site2].x && points[e.site1].y > points[e.site2].y)
+			{
+				e.isDirLeft = false;
+			}
+			dcel.edges.push_back(e);
+			intersection->edgepq = dcel.edges.size() - 1;
+			
 			createCircleEvents(ev.y, left, intersection, right, left, intersection, right);
 		}
 		}
 	}
 
-	return res;
+	return dcel;
 }
 
 int main()
 {
-	auto vor = fortune({ {0, 10}, {1, 9}, {5, 8}, {0.5, 7} });
+	auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {-1, 2} };
+	auto vor = fortune(points);
+	const auto leftBorder = -20;
+	const auto rightBorder = 20;
+
+	vector<double> vertexXs;
+	vector<double> vertexYs;
+	for(const auto& p : vor.vertices)
+	{
+		vertexXs.push_back(p.x);
+		vertexYs.push_back(p.y);
+	}
+
+	vector<size_t> edgeAs;
+	vector<size_t> edgeBs;
+	vector<double> infEdgeAXs;
+	vector<double> infEdgeAYs;
+	vector<double> infEdgeBXs;
+	vector<double> infEdgeBYs;
+	for (const auto& e : vor.edges)
+	{
+		assert(!e.aEmpty || !e.bEmpty);
+		if (!e.aEmpty && !e.bEmpty)
+		{
+			edgeAs.push_back(e.a);
+			edgeBs.push_back(e.b);
+		}
+		else
+		{
+			const auto m = (points[e.site1].x - points[e.site2].x) / (points[e.site2].y - points[e.site1].y);
+			const auto f = -m * (points[e.site1].x + points[e.site2].x) / 2 + (points[e.site2].y + points[e.site2].y) / 2;
+			const auto vertex = vor.vertices[e.a];
+			infEdgeAXs.push_back(vertex.x);
+			infEdgeAYs.push_back(vertex.y);
+			if (e.isDirLeft)
+			{
+				infEdgeBXs.push_back(leftBorder);
+			}
+			else
+			{
+				infEdgeBXs.push_back(rightBorder);
+			}
+			infEdgeBYs.push_back(m * infEdgeBXs.back() + f);
+		}
+	}
+
+	vector<double> pointXs;
+	vector<double> pointYs;
+	for(const auto& p : points)
+	{
+		pointXs.push_back(p.x);
+		pointYs.push_back(p.y);
+	}
+
+	try
+	{
+		py::scoped_interpreter interpreter_guard{};
+
+		py::dict locals{
+			"vertexXs"_a = vertexXs, "vertexYs"_a = vertexYs,
+			"edgeAs"_a = edgeAs, "edgeBs"_a = edgeBs,
+			"infEdgeAXs"_a = infEdgeAXs, "infEdgeAYs"_a = infEdgeAYs, "infEdgeBXs"_a = infEdgeBXs, "infEdgeBYs"_a = infEdgeBYs,
+			"pointXs"_a = pointXs, "pointYs"_a = pointYs };
+		py::exec(R"(
+			import numpy as np
+			import matplotlib.pyplot as plt
+			vertexXs = np.array(vertexXs)
+			vertexYs = np.array(vertexYs)
+			edgeAs = np.array(edgeAs)
+			edgeBs = np.array(edgeBs)
+
+			infEdgeXs = np.zeros((2, len(infEdgeAXs)))
+			infEdgeXs[0,:] = np.array(infEdgeAXs)
+			infEdgeXs[1,:] = np.array(infEdgeBXs)
+			infEdgeYs = np.zeros((2, len(infEdgeAYs)))
+			infEdgeYs[0,:] = np.array(infEdgeAYs)
+			infEdgeYs[1,:] = np.array(infEdgeBYs)
+
+			pointXs = np.array(pointXs)
+			pointYs = np.array(pointYs)
+			edges = np.zeros((len(edgeAs), 2), dtype=np.uint64)
+			edges[:,0] = edgeAs
+			edges[:,1] = edgeBs
+			fig = plt.figure()
+			ax = fig.add_subplot(111)
+			ax.scatter(vertexXs, vertexYs, c = 'b')
+			ax.plot(vertexXs[edges.T], vertexYs[edges.T], 'y-')
+			ax.plot(infEdgeXs, infEdgeYs, 'y-')
+			ax.plot()
+			ax.scatter(pointXs, pointYs, c = 'r')
+			ax.set_aspect(1)
+			plt.xlim([-15,15])
+			plt.ylim([-15,15])
+			plt.show()
+			)",
+			py::globals(), locals);
+	}
+	catch (std::exception e)
+	{
+		std::cout << e.what() << "\n";
+	}
+
 	return 0;
 }
