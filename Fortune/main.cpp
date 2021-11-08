@@ -815,6 +815,27 @@ DoublyConnectedEdgeList fortune(vector<Point> points)
 
 			auto s1 = dcel.edges[leftIntersection->edgepq].site1 = left->p;
 			auto s2 = dcel.edges[leftIntersection->edgepq].site2 = arcToRemove->p;
+			auto bads = right->p;
+
+			// ax + by + c = 0
+			auto a = - (points[s2].y - points[s1].y) / (points[s2].x - points[s1].x);
+			auto b = 1.0;
+			auto c = - (points[s2].y + a * points[s2].x);
+
+			auto dist = (a*points[bads].x+b*points[bads].y+c);
+
+			auto middleX = (points[s2].x + points[s1].x)/2;
+			auto middleY = (points[s2].y + points[s1].y)/2;
+
+			if ( ((a*(middleX+1)+b*middleY+c))*(dist) > 0 )
+			{
+				dcel.edges[leftIntersection->edgepq].isDirLeft = true;
+			}
+			else
+			{
+				dcel.edges[leftIntersection->edgepq].isDirLeft = false;
+			}
+
 			if (dcel.edges[leftIntersection->edgepq].aEmpty)
 			{
 				dcel.edges[leftIntersection->edgepq].a = dcel.vertices.size() - 1;
@@ -826,25 +847,45 @@ DoublyConnectedEdgeList fortune(vector<Point> points)
 				dcel.edges[leftIntersection->edgepq].bEmpty = false;
 			}
 
-			if (points[s1].x < points[s2].x && points[s1].y < points[s2].y)
-			{
-				dcel.edges[leftIntersection->edgepq].isDirLeft = true;
-			}
-			else if (points[s1].x < points[s2].x && points[s1].y > points[s2].y)
-			{
-				dcel.edges[leftIntersection->edgepq].isDirLeft = false;
-			}
-			else if (points[s1].x > points[s2].x && points[s1].y < points[s2].y)
-			{
-				dcel.edges[leftIntersection->edgepq].isDirLeft = false;
-			}
-			else if (points[s1].x > points[s2].x && points[s1].y > points[s2].y)
-			{
-				dcel.edges[leftIntersection->edgepq].isDirLeft = true;
-			}
+			// if (points[s1].x < points[s2].x && points[s1].y < points[s2].y)
+			// {
+			// 	dcel.edges[leftIntersection->edgepq].isDirLeft = true;
+			// }
+			// else if (points[s1].x < points[s2].x && points[s1].y > points[s2].y)
+			// {
+			// 	dcel.edges[leftIntersection->edgepq].isDirLeft = false;
+			// }
+			// else if (points[s1].x > points[s2].x && points[s1].y < points[s2].y)
+			// {
+			// 	dcel.edges[leftIntersection->edgepq].isDirLeft = false;
+			// }
+			// else if (points[s1].x > points[s2].x && points[s1].y > points[s2].y)
+			// {
+			// 	dcel.edges[leftIntersection->edgepq].isDirLeft = true;
+			// }
 
 			s1 = dcel.edges[rightIntersection->edgepq].site1 = arcToRemove->p;
 			s2 = dcel.edges[rightIntersection->edgepq].site2 = right->p;
+			bads = left->p;
+
+			a = - (points[s2].y - points[s1].y) / (points[s2].x - points[s1].x);
+			b = 1.0;
+			c = - (points[s2].y + a * points[s2].x);
+
+			dist = (a*points[bads].x+b*points[bads].y+c);
+
+			middleX = (points[s2].x + points[s1].x)/2;
+			middleY = (points[s2].y + points[s1].y)/2;
+
+			if ( ((a*(middleX+1)+b*middleY+c))*(dist) > 0 )
+			{
+				dcel.edges[rightIntersection->edgepq].isDirLeft = true;
+			}
+			else
+			{
+				dcel.edges[rightIntersection->edgepq].isDirLeft = false;
+			}
+
 			if (dcel.edges[rightIntersection->edgepq].aEmpty)
 			{
 				dcel.edges[rightIntersection->edgepq].a = dcel.vertices.size() - 1;
@@ -856,23 +897,25 @@ DoublyConnectedEdgeList fortune(vector<Point> points)
 				dcel.edges[rightIntersection->edgepq].bEmpty = false;
 			}
 
-			if (points[s1].x < points[s2].x && points[s1].y < points[s2].y)
-			{
-				dcel.edges[rightIntersection->edgepq].isDirLeft = true;
-			}
-			else if (points[s1].x < points[s2].x && points[s1].y > points[s2].y)
-			{
-				dcel.edges[rightIntersection->edgepq].isDirLeft = false;
-			}
-			else if (points[s1].x > points[s2].x && points[s1].y < points[s2].y)
-			{
-				dcel.edges[rightIntersection->edgepq].isDirLeft = false;
-			}
-			else if (points[s1].x > points[s2].x && points[s1].y > points[s2].y)
-			{
-				dcel.edges[rightIntersection->edgepq].isDirLeft = true;
-			}
 
+			// if (points[s1].x < points[s2].x && points[s1].y < points[s2].y)
+			// {
+			// 	dcel.edges[rightIntersection->edgepq].isDirLeft = true;
+			// }
+			// else if (points[s1].x < points[s2].x && points[s1].y > points[s2].y)
+			// {
+			// 	dcel.edges[rightIntersection->edgepq].isDirLeft = false;
+			// }
+			// else if (points[s1].x > points[s2].x && points[s1].y < points[s2].y)
+			// {
+			// 	dcel.edges[rightIntersection->edgepq].isDirLeft = false;
+			// }
+			// else if (points[s1].x > points[s2].x && points[s1].y > points[s2].y)
+			// {
+			// 	dcel.edges[rightIntersection->edgepq].isDirLeft = true;
+			// }
+
+			bads = arcToRemove->p;
 			const auto intersection = beachLine.removeArc(arcToRemove);
 
 			auto e = DoublyConnectedEdgeList::Edge{
@@ -880,25 +923,47 @@ DoublyConnectedEdgeList fortune(vector<Point> points)
 				.aEmpty = false,
 				.site1 = left->p, .site2 = right->p
 			};
-			if (points[e.site1].x < points[e.site2].x && points[e.site1].y < points[e.site2].y)
-			{
-				e.isDirLeft = false;
-			}
-			else if (points[e.site1].x < points[e.site2].x && points[e.site1].y > points[e.site2].y)
-			{
-				e.isDirLeft = true;
-			}
-			else if (points[e.site1].x > points[e.site2].x && points[e.site1].y < points[e.site2].y)
-			{
-				e.isDirLeft = true;
-			}
-			else if (points[e.site1].x > points[e.site2].x && points[e.site1].y > points[e.site2].y)
-			{
-				e.isDirLeft = false;
-			}
+
+			s1 = left->p;
+			s2 = right->p;
+
+			a = - (points[s2].y - points[s1].y) / (points[s2].x - points[s1].x);
+			b = 1.0;
+			c = - (points[s2].y + a * points[s2].x);
+
+			dist = (a*points[bads].x+b*points[bads].y+c);
+
+			middleX = (points[s2].x + points[s1].x)/2;
+			middleY = (points[s2].y + points[s1].y)/2;
+
+			
+
+			// if (points[e.site1].x < points[e.site2].x && points[e.site1].y < points[e.site2].y)
+			// {
+			// 	e.isDirLeft = false;
+			// }
+			// else if (points[e.site1].x < points[e.site2].x && points[e.site1].y > points[e.site2].y)
+			// {
+			// 	e.isDirLeft = true;
+			// }
+			// else if (points[e.site1].x > points[e.site2].x && points[e.site1].y < points[e.site2].y)
+			// {
+			// 	e.isDirLeft = true;
+			// }
+			// else if (points[e.site1].x > points[e.site2].x && points[e.site1].y > points[e.site2].y)
+			// {
+			// 	e.isDirLeft = false;
+			// }
 			dcel.edges.push_back(e);
 			intersection->edgepq = dcel.edges.size() - 1;
-			
+			if ( ((a*(middleX+1)+b*middleY+c))*(dist) > 0 )
+			{
+				dcel.edges[intersection->edgepq].isDirLeft = true;
+			}
+			else
+			{
+				dcel.edges[intersection->edgepq].isDirLeft = false;
+			}
 			createCircleEvents(ev.y, left, intersection, right, left, intersection, right);
 		}
 		}
@@ -909,7 +974,7 @@ DoublyConnectedEdgeList fortune(vector<Point> points)
 
 int main()
 {
-	auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {-1, 2} };
+	auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {-9, 2}, {-7, 7.5}, {-3, 0}, {-2,6}};
 	auto vor = fortune(points);
 	const auto leftBorder = -20;
 	const auto rightBorder = 20;
@@ -939,7 +1004,7 @@ int main()
 		else
 		{
 			const auto m = (points[e.site1].x - points[e.site2].x) / (points[e.site2].y - points[e.site1].y);
-			const auto f = -m * (points[e.site1].x + points[e.site2].x) / 2 + (points[e.site2].y + points[e.site2].y) / 2;
+			const auto f = -m * (points[e.site1].x + points[e.site2].x) / 2 + (points[e.site1].y + points[e.site2].y) / 2;
 			const auto vertex = vor.vertices[e.a];
 			infEdgeAXs.push_back(vertex.x);
 			infEdgeAYs.push_back(vertex.y);
