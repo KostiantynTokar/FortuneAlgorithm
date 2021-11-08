@@ -997,7 +997,8 @@ DoublyConnectedEdgeList fortune(vector<Point> points)
 
 int main()
 {
-	auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {-9, 2}, {-7,11} };
+	auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6} };
+	sort(begin(points), end(points), [](const auto& a, const auto& b) { return a.y > b.y; });
 	auto vor = fortune(points);
 	const auto leftBorder = -20;
 	const auto rightBorder = 20;
