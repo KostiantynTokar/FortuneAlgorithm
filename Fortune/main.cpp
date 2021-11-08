@@ -31,8 +31,15 @@ struct DoublyConnectedEdgeList
 		size_t site2;
 		bool isDirLeft; // from -inf to vertex.
 	};
+	struct DelaunayEdge
+	{
+		// TODO: change to indices to input sites.
+		Point a;
+		Point b;
+	};
 	vector<Edge> edges; // up to n^2 elements?
 	vector<Point> vertices;
+	vector<DelaunayEdge> delaunayEdges;
 };
 
 // Returns x-coordinate of left intersection if site1.x <= site2.x and x-coordinate of right intersection otherwise.
@@ -980,16 +987,21 @@ DoublyConnectedEdgeList fortune(vector<Point> points)
 		}
 	}
 
+	for (const auto& e : dcel.edges)
+	{
+		dcel.delaunayEdges.push_back({ points[e.site1], points[e.site2] });
+	}
+
 	return dcel;
 }
 
 int main()
 {
-	auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {-9, 2}, {-7, 7.5}, {-3, 0}, {-2,6}};
+	auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {-9, 2}, {-7,7.5}};
 	auto vor = fortune(points);
 	const auto leftBorder = -20;
 	const auto rightBorder = 20;
-
+// /, {-7, 7.5}, {-3, 0}, {-2,6}
 	vector<double> vertexXs;
 	vector<double> vertexYs;
 	for(const auto& p : vor.vertices)
@@ -1031,6 +1043,18 @@ int main()
 		}
 	}
 
+	vector<double> delaunayEdgeAXs;
+	vector<double> delaunayEdgeAYs;
+	vector<double> delaunayEdgeBXs;
+	vector<double> delaunayEdgeBYs;
+	for (const auto& e : vor.delaunayEdges)
+	{
+		delaunayEdgeAXs.push_back(e.a.x);
+		delaunayEdgeAYs.push_back(e.a.y);
+		delaunayEdgeBXs.push_back(e.b.x);
+		delaunayEdgeBYs.push_back(e.b.y);
+	}
+
 	vector<double> pointXs;
 	vector<double> pointYs;
 	for(const auto& p : points)
@@ -1047,6 +1071,7 @@ int main()
 			"vertexXs"_a = vertexXs, "vertexYs"_a = vertexYs,
 			"edgeAs"_a = edgeAs, "edgeBs"_a = edgeBs,
 			"infEdgeAXs"_a = infEdgeAXs, "infEdgeAYs"_a = infEdgeAYs, "infEdgeBXs"_a = infEdgeBXs, "infEdgeBYs"_a = infEdgeBYs,
+			"delaunayEdgeAXs"_a = delaunayEdgeAXs, "delaunayEdgeAYs"_a = delaunayEdgeAYs, "delaunayEdgeBXs"_a = delaunayEdgeBXs, "delaunayEdgeBYs"_a = delaunayEdgeBYs,
 			"pointXs"_a = pointXs, "pointYs"_a = pointYs };
 		py::exec(R"(
 			import numpy as np
@@ -1063,6 +1088,13 @@ int main()
 			infEdgeYs[0,:] = np.array(infEdgeAYs)
 			infEdgeYs[1,:] = np.array(infEdgeBYs)
 
+			delaunayEdgeXs = np.zeros((2, len(delaunayEdgeAXs)))
+			delaunayEdgeXs[0,:] = np.array(delaunayEdgeAXs)
+			delaunayEdgeXs[1,:] = np.array(delaunayEdgeBXs)
+			delaunayEdgeYs = np.zeros((2, len(delaunayEdgeBXs)))
+			delaunayEdgeYs[0,:] = np.array(delaunayEdgeAYs)
+			delaunayEdgeYs[1,:] = np.array(delaunayEdgeBYs)
+
 			pointXs = np.array(pointXs)
 			pointYs = np.array(pointYs)
 			edges = np.zeros((len(edgeAs), 2), dtype=np.uint64)
@@ -1073,7 +1105,7 @@ int main()
 			ax.scatter(vertexXs, vertexYs, c = 'b')
 			ax.plot(vertexXs[edges.T], vertexYs[edges.T], 'y-')
 			ax.plot(infEdgeXs, infEdgeYs, 'y-')
-			ax.plot()
+			ax.plot(delaunayEdgeXs, delaunayEdgeYs, 'r-')
 			ax.scatter(pointXs, pointYs, c = 'r')
 			ax.set_aspect(1)
 			plt.xlim([-15,15])
