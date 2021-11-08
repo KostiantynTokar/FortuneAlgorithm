@@ -175,49 +175,60 @@ struct BeachLine
 			rightInd = intersectedArc;
 		}
 
-		auto newSubTree = new Node{ .parent = regionNodeParent, .left = nullptr, .right = nullptr, .p = leftInd, .q = rightInd, .circleEventId = -1, .balance = 1 };
+		auto newSubTree = new Node{ .parent = regionNodeParent, .left = nullptr, .right = nullptr, .p = leftInd, .q = rightInd, .circleEventId = -1, .balance = 0 };
 		newSubTree->left = regionNode;
 		newSubTree->left->parent = newSubTree;
 		newSubTree->left->circleEventId = -1;
+		newSubTree->left->edgepq = -1;
 		newSubTree->right = new Node{ .parent = newSubTree, .left = nullptr, .right = nullptr, .p = rightInd, .q = leftInd, .circleEventId = -1, .balance = 0 };
-		newSubTree->right->left = new Node{ .parent = newSubTree->right, .left = nullptr, .right = nullptr, .p = site, .q = 0, .circleEventId = -1, .balance = 0 };
-		newSubTree->right->right = new Node{ .parent = newSubTree->right, .left = nullptr, .right = nullptr, .p = intersectedArc, .q = 0, .circleEventId = -1, .balance = 0 };
+		const auto redLeaf = newSubTree->right; // Rebalance, then add to this node 2 children.
+		//newSubTree->right->left = new Node{ .parent = newSubTree->right, .left = nullptr, .right = nullptr, .p = site, .q = 0, .circleEventId = -1, .balance = 0 };
+		//newSubTree->right->right = new Node{ .parent = newSubTree->right, .left = nullptr, .right = nullptr, .p = intersectedArc, .q = 0, .circleEventId = -1, .balance = 0 };
 
-		const auto res = NewArcInfo{
+		auto res = NewArcInfo{
 			.id = eventId,
 			.left = newSubTree->left,
 			.leftCentralIntersection = newSubTree,
-			.central = newSubTree->right->left,
+			//.central = newSubTree->right->left,
 			.centralRightIntersection = newSubTree->right,
-			.right = newSubTree->right->right
+			//.right = newSubTree->right->right
 		};
 		
 		replaceNode(regionNode, newSubTree, regionNodeParent);
 
 		auto child = newSubTree;
-		bool needRebalance = false;
-		if (regionNodeParent != nullptr)
-		{
-			if (regionNodeParent->left == newSubTree)
-				regionNodeParent->balance -= 2;
-			else
-				regionNodeParent->balance += 2;
-			assert(-2 <= regionNodeParent->balance && regionNodeParent->balance <= 2);
-			child = regionNodeParent;
-			regionNodeParent = regionNodeParent->parent;
-			needRebalance = rebalanceSubTree(child, regionNodeParent);
-		}
-
+		bool needRebalance = true;
 		while (regionNodeParent != nullptr && (needRebalance || child->balance == 0))
 		{
 			if (regionNodeParent->left == child)
 				--regionNodeParent->balance;
 			else
 				++regionNodeParent->balance;
-
+			assert(-2 <= regionNodeParent->balance && regionNodeParent->balance <= 2);
 			child = regionNodeParent;
 			regionNodeParent = regionNodeParent->parent;
-			rebalanceSubTree(child, regionNodeParent);
+			needRebalance = rebalanceSubTree(child, regionNodeParent);
+		}
+
+		redLeaf->left = new Node{ .parent = redLeaf, .left = nullptr, .right = nullptr, .p = site, .q = 0, .circleEventId = -1, .balance = 0 };
+		redLeaf->right = new Node{ .parent = redLeaf, .left = nullptr, .right = nullptr, .p = intersectedArc, .q = 0, .circleEventId = -1, .balance = 0 };
+
+		res.central = redLeaf->left;
+		res.right = redLeaf->right;
+
+		child = redLeaf;
+		regionNodeParent = child->parent;
+		needRebalance = true;
+		while (regionNodeParent != nullptr && (needRebalance || child->balance == 0))
+		{
+			if (regionNodeParent->left == child)
+				--regionNodeParent->balance;
+			else
+				++regionNodeParent->balance;
+			assert(-2 <= regionNodeParent->balance && regionNodeParent->balance <= 2);
+			child = regionNodeParent;
+			regionNodeParent = regionNodeParent->parent;
+			needRebalance = rebalanceSubTree(child, regionNodeParent);
 		}
 
 		return res;
