@@ -205,7 +205,7 @@ struct BeachLine
 
 		auto child = newSubTree;
 		bool needRebalance = true;
-		while (regionNodeParent != nullptr && (needRebalance || child->balance == 0))
+		while (regionNodeParent != nullptr && (needRebalance || child->balance != 0))
 		{
 			if (regionNodeParent->left == child)
 				--regionNodeParent->balance;
@@ -226,7 +226,7 @@ struct BeachLine
 		child = redLeaf;
 		regionNodeParent = child->parent;
 		needRebalance = true;
-		while (regionNodeParent != nullptr && (needRebalance || child->balance == 0))
+		while (regionNodeParent != nullptr && (needRebalance || child->balance != 0))
 		{
 			if (regionNodeParent->left == child)
 				--regionNodeParent->balance;
@@ -997,11 +997,12 @@ DoublyConnectedEdgeList fortune(vector<Point> points)
 
 int main()
 {
-	auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {-9, 2}, {-7,7.5}};
+	auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {-9, 2}, {-7,11} };
 	auto vor = fortune(points);
 	const auto leftBorder = -20;
 	const auto rightBorder = 20;
-// /, {-7, 7.5}, {-3, 0}, {-2,6}
+// 
+// /, {-3, 0}, {-2,6}
 	vector<double> vertexXs;
 	vector<double> vertexYs;
 	for(const auto& p : vor.vertices)
@@ -1078,8 +1079,10 @@ int main()
 			import matplotlib.pyplot as plt
 			vertexXs = np.array(vertexXs)
 			vertexYs = np.array(vertexYs)
-			edgeAs = np.array(edgeAs)
-			edgeBs = np.array(edgeBs)
+
+			edges = np.zeros((2, len(edgeAs)), dtype=np.uint64)
+			edges[0,:] = np.array(edgeAs)
+			edges[1,:] = np.array(edgeBs)
 
 			infEdgeXs = np.zeros((2, len(infEdgeAXs)))
 			infEdgeXs[0,:] = np.array(infEdgeAXs)
@@ -1097,13 +1100,11 @@ int main()
 
 			pointXs = np.array(pointXs)
 			pointYs = np.array(pointYs)
-			edges = np.zeros((len(edgeAs), 2), dtype=np.uint64)
-			edges[:,0] = edgeAs
-			edges[:,1] = edgeBs
+			
 			fig = plt.figure()
 			ax = fig.add_subplot(111)
 			ax.scatter(vertexXs, vertexYs, c = 'b')
-			ax.plot(vertexXs[edges.T], vertexYs[edges.T], 'y-')
+			ax.plot(vertexXs[edges], vertexYs[edges], 'y-')
 			ax.plot(infEdgeXs, infEdgeYs, 'y-')
 			ax.plot(delaunayEdgeXs, delaunayEdgeYs, 'r-')
 			ax.scatter(pointXs, pointYs, c = 'r')
