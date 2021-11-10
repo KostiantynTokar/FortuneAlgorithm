@@ -987,18 +987,12 @@ int main()
 		}
 	}
 
-	vector<double> delaunayEdgeAXs;
-	vector<double> delaunayEdgeAYs;
-	vector<double> delaunayEdgeBXs;
-	vector<double> delaunayEdgeBYs;
+	vector<size_t> delaunayEdgeAs;
+	vector<size_t> delaunayEdgeBs;
 	for (size_t i{ 0 }; i != vor.edges.size(); i += 2)
 	{
-		const auto& e = vor.edges[i];
-		const auto& eTwin = vor.edges[e.twin];
-		delaunayEdgeAXs.push_back(points[e.face].x);
-		delaunayEdgeAYs.push_back(points[e.face].y);
-		delaunayEdgeBXs.push_back(points[eTwin.face].x);
-		delaunayEdgeBYs.push_back(points[eTwin.face].y);
+		delaunayEdgeAs.push_back(vor.edges[i].face);
+		delaunayEdgeBs.push_back(vor.edges[i + 1].face);
 	}
 
 	vector<double> pointXs;
@@ -1018,7 +1012,7 @@ int main()
 			"vertexXs"_a = vertexXs, "vertexYs"_a = vertexYs,
 			"edgeAs"_a = edgeAs, "edgeBs"_a = edgeBs,
 			"infEdgeAs"_a = infEdgeAs, "infEdgeBXs"_a = infEdgeBXs, "infEdgeBYs"_a = infEdgeBYs,
-			"delaunayEdgeAXs"_a = delaunayEdgeAXs, "delaunayEdgeAYs"_a = delaunayEdgeAYs, "delaunayEdgeBXs"_a = delaunayEdgeBXs, "delaunayEdgeBYs"_a = delaunayEdgeBYs,
+			"delaunayEdgeAs"_a = delaunayEdgeAs, "delaunayEdgeBs"_a = delaunayEdgeBs,
 			"pointXs"_a = pointXs, "pointYs"_a = pointYs
 		};
 
@@ -1040,12 +1034,9 @@ int main()
 			infEdgeYs[0, :] = vertexYs[infEdgeAs]
 			infEdgeYs[1, :] = np.array(infEdgeBYs)
 
-			delaunayEdgeXs = np.zeros((2, len(delaunayEdgeAXs)))
-			delaunayEdgeXs[0,:] = np.array(delaunayEdgeAXs)
-			delaunayEdgeXs[1,:] = np.array(delaunayEdgeBXs)
-			delaunayEdgeYs = np.zeros((2, len(delaunayEdgeBXs)))
-			delaunayEdgeYs[0,:] = np.array(delaunayEdgeAYs)
-			delaunayEdgeYs[1,:] = np.array(delaunayEdgeBYs)
+			delaunayEdges = np.zeros((2, len(delaunayEdgeAs)), dtype = np.uint64)
+			delaunayEdges[0, :] = np.array(delaunayEdgeAs)
+			delaunayEdges[1, :] = np.array(delaunayEdgeBs)
 
 			pointXs = np.array(pointXs)
 			pointYs = np.array(pointYs)
@@ -1055,7 +1046,7 @@ int main()
 			ax.scatter(vertexXs, vertexYs, c = 'b')
 			ax.plot(vertexXs[edges], vertexYs[edges], 'y-')
 			ax.plot(infEdgeXs, infEdgeYs, 'y-')
-			ax.plot(delaunayEdgeXs, delaunayEdgeYs, 'r-')
+			ax.plot(pointXs[delaunayEdges], pointYs[delaunayEdges], 'r-')
 			ax.scatter(pointXs, pointYs, c = 'r')
 			ax.set_aspect(1)
 			plt.xlim([drawMinX, drawMaxX])
