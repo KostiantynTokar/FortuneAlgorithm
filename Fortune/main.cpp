@@ -114,14 +114,11 @@ struct BeachLine
 
 	Node* root;
 	const std::vector<Point>& points;
-	size_t pointIndToInsert;
 
 	constexpr BeachLine(const std::vector<Point>& points)
 		: points{ points }
 		, root{ nullptr }
-		, pointIndToInsert{ 0 }
 	{
-		assert(is_sorted(cbegin(points), cend(points), [](const auto& a, const auto& b) { return a.y > b.y; }));
 	}
 
 	~BeachLine()
@@ -156,12 +153,11 @@ struct BeachLine
 		Node* right;
 	};
 
-	constexpr NewArcInfo insertArc()
+	constexpr NewArcInfo insertArc(const size_t site)
 	{
-		const auto site = pointIndToInsert++;
 		if (empty())
 		{
-			root = new Node{ .parent = nullptr, .left = nullptr, .right = nullptr, .p = 0, .q = 0, .circleEventId = -1, .balance = 0 };
+			root = new Node{ .parent = nullptr, .left = nullptr, .right = nullptr, .p = site, .q = 0, .circleEventId = -1, .balance = 0 };
 			return { -1, nullptr, nullptr, root, nullptr, nullptr };
 		}
 		auto regionNode = findRegion(site);
@@ -253,7 +249,7 @@ struct BeachLine
 		auto s1 = higherNode->p == node->p ? higherNode->q : higherNode->p;
 		auto s2 = lowerNode->p == node->p ? lowerNode->q : lowerNode->p;
 		bool isNewIntersectionLeft;
-		if (s1 > s2)
+		if (points[s1].y < points[s2].y)
 			isNewIntersectionLeft = points[higherNode->p].x < points[higherNode->q].x;
 		else
 			isNewIntersectionLeft = points[lowerNode->p].x < points[lowerNode->q].x;
@@ -533,13 +529,16 @@ struct PriorityQueue
 		, size{ points.size() }
 		, newId{ points.size() }
 	{
-		assert(is_sorted(cbegin(points), cend(points), [](const auto& a, const auto& b) { return a.y > b.y; }));
 		idToInd.reserve(points.size());
 		for (size_t i{ 0 }; i != points.size(); ++i)
 		{
 			storage[i] = Event{ .y = points[i].y, .type = Event::Type::site };
 			ids[i] = i;
 			idToInd.push_back(i);
+		}
+		for (size_t i{ points.size() / 2 + 1 }; i != 0; --i)
+		{
+			downHeapify(i - 1);
 		}
 	}
 
@@ -577,10 +576,11 @@ struct PriorityQueue
 		}
 	}
 
-	constexpr Event pop()
+	// Returns first event in the queue and its id. Id of a site event is its index in the vertices vector.
+	constexpr tuple<Event, size_t> pop()
 	{
 		assert(!empty());
-		const auto res = storage[0];
+		const auto res = make_tuple(storage[0], ids[0]);
 		moveFromLast(0);
 		downHeapify(0);
 		return res;
@@ -736,21 +736,25 @@ bool isConvergent(const double y, const Point& a1, const Point& a2, const Point&
 			return false;
 	}
 
-#ifdef _DEBUG
+//#ifdef _DEBUG
 	const auto site1 = a1;
 	const auto site2 = a2;
 	const auto site3 = ((b1.x == a1.x && b1.y == a1.y) || (b1.x == a2.x && b1.y == a2.y)) ? b2 : b1;
+	if (y < get<0>(circleBottomPoint(site1, site2, site3)))
+	{
+		return false;
+	}
+	// TODO: is it correct assertion?
 	assert(y >= get<0>(circleBottomPoint(site1, site2, site3)));
-#endif
+//#endif
 
 	return true;
 }
 
-DoublyConnectedEdgeList fortune(vector<Point> points)
+DoublyConnectedEdgeList fortune(const vector<Point>& points)
 {
 	auto dcel = DoublyConnectedEdgeList{};
 
-	sort(begin(points), end(points), [](const auto& a, const auto& b) { return a.y > b.y; });
 	auto queue = PriorityQueue{ points };
 	auto beachLine = BeachLine{ points };
 
@@ -783,22 +787,23 @@ DoublyConnectedEdgeList fortune(vector<Point> points)
 
 	if (!queue.empty())
 	{
-		queue.pop();
-		beachLine.insertArc();
+		const auto [ev, evId] = queue.pop();
+		beachLine.insertArc(evId);
 	}
 
 	while (!queue.empty())
 	{
-		auto ev = queue.pop();
+		const auto [ev, evId] = queue.pop();
 		switch (ev.type)
 		{
 		break; case Event::Type::site:
 		{
-			const auto [eventId, left, leftCentral, central, centralRight, right] = beachLine.insertArc();
-			if (eventId != -1)
+			const auto [intersectedArcEventId, left, leftCentral, central, centralRight, right] = beachLine.insertArc(evId);
+			if (intersectedArcEventId != -1)
 			{
-				queue.removeById(eventId);
+				queue.removeById(intersectedArcEventId);
 			}
+			assert(central->p != left->p);
 			const auto e = DoublyConnectedEdgeList::Edge{ .site1 = central->p, .site2 = left->p };
 			dcel.edges.push_back(e);
 			centralRight->edgepq = leftCentral->edgepq = dcel.edges.size() - 1;
@@ -997,13 +1002,10 @@ DoublyConnectedEdgeList fortune(vector<Point> points)
 
 int main()
 {
-	auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6} };
-	sort(begin(points), end(points), [](const auto& a, const auto& b) { return a.y > b.y; });
+	auto points = vector<Point>{{0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5},  {-9, 2}, {-11,7}, {-3, 0}, {-2,6} };
 	auto vor = fortune(points);
 	const auto leftBorder = -20;
 	const auto rightBorder = 20;
-// 
-// /, {-3, 0}, {-2,6}
 	vector<double> vertexXs;
 	vector<double> vertexYs;
 	for(const auto& p : vor.vertices)
@@ -1020,7 +1022,9 @@ int main()
 	vector<double> infEdgeBYs;
 	for (const auto& e : vor.edges)
 	{
-		assert(!e.aEmpty || !e.bEmpty);
+		//assert(!e.aEmpty || !e.bEmpty);
+		if (e.aEmpty && e.bEmpty)
+			continue;
 		if (!e.aEmpty && !e.bEmpty)
 		{
 			edgeAs.push_back(e.a);
