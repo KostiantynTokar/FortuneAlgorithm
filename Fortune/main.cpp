@@ -853,28 +853,28 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 			assert(leftIntersection->edgepq != -1);
 			assert(rightIntersection->edgepq != -1);
 
-			auto s1 = dcel.edges[leftIntersection->edgepq].site1 = left->p;
-			auto s2 = dcel.edges[leftIntersection->edgepq].site2 = arcToRemove->p;
-			auto bads = right->p;
-
-			// ax + by + c = 0
-			auto a = - (points[s2].y - points[s1].y) / (points[s2].x - points[s1].x);
-			auto b = 1.0;
-			auto c = - (points[s2].y + a * points[s2].x);
-
-			auto dist = (a*points[bads].x+b*points[bads].y+c);
-
-			auto middleX = (points[s2].x + points[s1].x)/2;
-			auto middleY = (points[s2].y + points[s1].y)/2;
-
-			if ( ((a*(middleX+1)+b*middleY+c))*(dist) > 0 )
+			const auto calcIsDirLeft = [](const Point& s1, const Point& s2, const Point& bads)
 			{
-				dcel.edges[leftIntersection->edgepq].isDirLeft = true;
-			}
-			else
-			{
-				dcel.edges[leftIntersection->edgepq].isDirLeft = false;
-			}
+				// ax + by + c = 0
+				const auto a = -(s2.y - s1.y) / (s2.x - s1.x);
+				const auto b = 1.0;
+				const auto c = -(s2.y + a * s2.x);
+
+				const auto dist = (a * bads.x + b * bads.y + c);
+
+				const auto middleX = (s2.x + s1.x) / 2;
+				const auto middleY = (s2.y + s1.y) / 2;
+
+				return (a * (middleX + 1) + b * middleY + c) * dist > 0;
+			};
+
+			dcel.edges[leftIntersection->edgepq].site1 = left->p;
+			dcel.edges[leftIntersection->edgepq].site2 = arcToRemove->p;
+			dcel.edges[leftIntersection->edgepq].isDirLeft = calcIsDirLeft(
+				points[left->p],
+				points[arcToRemove->p],
+				points[right->p]
+			);
 
 			if (dcel.edges[leftIntersection->edgepq].aEmpty)
 			{
@@ -887,27 +887,13 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 				dcel.edges[leftIntersection->edgepq].bEmpty = false;
 			}
 
-			s1 = dcel.edges[rightIntersection->edgepq].site1 = arcToRemove->p;
-			s2 = dcel.edges[rightIntersection->edgepq].site2 = right->p;
-			bads = left->p;
-
-			a = - (points[s2].y - points[s1].y) / (points[s2].x - points[s1].x);
-			b = 1.0;
-			c = - (points[s2].y + a * points[s2].x);
-
-			dist = (a*points[bads].x+b*points[bads].y+c);
-
-			middleX = (points[s2].x + points[s1].x)/2;
-			middleY = (points[s2].y + points[s1].y)/2;
-
-			if ( ((a*(middleX+1)+b*middleY+c))*(dist) > 0 )
-			{
-				dcel.edges[rightIntersection->edgepq].isDirLeft = true;
-			}
-			else
-			{
-				dcel.edges[rightIntersection->edgepq].isDirLeft = false;
-			}
+			dcel.edges[rightIntersection->edgepq].site1 = arcToRemove->p;
+			dcel.edges[rightIntersection->edgepq].site2 = right->p;
+			dcel.edges[rightIntersection->edgepq].isDirLeft = calcIsDirLeft(
+				points[arcToRemove->p],
+				points[right->p],
+				points[left->p]
+			);
 
 			if (dcel.edges[rightIntersection->edgepq].aEmpty)
 			{
@@ -920,37 +906,21 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 				dcel.edges[rightIntersection->edgepq].bEmpty = false;
 			}
 
-			bads = arcToRemove->p;
+			const auto bads = arcToRemove->p;
 			const auto intersection = beachLine.removeArc(arcToRemove);
 
-			auto e = DoublyConnectedEdgeList::Edge{
+			const auto e = DoublyConnectedEdgeList::Edge{
 				.a = dcel.vertices.size() - 1, 
 				.aEmpty = false,
 				.site1 = left->p, .site2 = right->p
 			};
 
-			s1 = left->p;
-			s2 = right->p;
-
-			a = - (points[s2].y - points[s1].y) / (points[s2].x - points[s1].x);
-			b = 1.0;
-			c = - (points[s2].y + a * points[s2].x);
-
-			dist = (a*points[bads].x+b*points[bads].y+c);
-
-			middleX = (points[s2].x + points[s1].x)/2;
-			middleY = (points[s2].y + points[s1].y)/2;
+			const auto s1 = left->p;
+			const auto s2 = right->p;
 
 			dcel.edges.push_back(e);
 			intersection->edgepq = dcel.edges.size() - 1;
-			if ( ((a*(middleX+1)+b*middleY+c))*(dist) > 0 )
-			{
-				dcel.edges[intersection->edgepq].isDirLeft = true;
-			}
-			else
-			{
-				dcel.edges[intersection->edgepq].isDirLeft = false;
-			}
+			dcel.edges[intersection->edgepq].isDirLeft = calcIsDirLeft(points[s1], points[s2], points[bads]);
 			
 			createCircleEvents(ev.y, left, intersection, right, left, intersection, right);
 		}
