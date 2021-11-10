@@ -809,7 +809,6 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 		}
 		break; case Event::Type::circle:
 		{
-			dcel.vertices.push_back({ ev.center, 0 }); // TODO: 0
 			const auto arcToRemove = ev.leaf;
 			const auto leftIntersection = get<0>(beachLine.findIntersectionWithLeftLeaf(arcToRemove));
 			const auto rightIntersection = get<0>(beachLine.findIntersectionWithRightLeaf(arcToRemove));
@@ -859,19 +858,22 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 			{
 				if (dcel.edges[edgepq].face == s)
 				{
-					dcel.edges[edgepq].vertexFrom = dcel.vertices.size() - 1;
+					dcel.edges[edgepq].vertexFrom = dcel.vertices.size();
 				}
 				else
 				{
-					dcel.edges[edgepq + 1].vertexFrom = dcel.vertices.size() - 1;
+					dcel.edges[edgepq + 1].vertexFrom = dcel.vertices.size();
 				}
 			};
 			
 			setVertexFrom(leftIntersectionEdgepq, s1);
 			setVertexFrom(rightIntersectionEdgepq, bads);
 			setVertexFrom(intersectionEdgepq, s2);
-			
-			dcel.vertices[dcel.vertices.size() - 1].edge = dcel.edges[intersectionEdgepq].face == s2 ? intersectionEdgepq : intersectionEdgepq + 1;
+
+			dcel.vertices.push_back({
+				.p = ev.center,
+				.edge = dcel.edges[intersectionEdgepq].face == s2 ? static_cast<size_t>(intersectionEdgepq) : static_cast<size_t>(intersectionEdgepq + 1)
+			});
 
 			// TODO: if this assertion about left orientation of a triangle (s1, bads, s2) is not true,
 			// then put body of setNextAndPrev in if block, copy it to else block with swapping next and prev in lhs.
@@ -905,8 +907,8 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 
 int main()
 {
-	auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6} };
-	auto vor = fortune(points);
+	const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6} };
+	const auto vor = fortune(points);
 	const auto leftBorder = -20;
 	const auto rightBorder = 20;
 	vector<double> vertexXs;
