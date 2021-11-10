@@ -334,28 +334,40 @@ struct BeachLine
 		return make_tuple(node->parent, height);
 	}
 
+	constexpr static Node* findLeafToLeftFromIntersection(Node* node)
+	{
+		assert(!node->isLeaf());
+		if (node == nullptr)
+			return nullptr;
+		node = node->left;
+		while (!node->isLeaf())
+			node = node->right;
+		return node;
+	}
+
+	constexpr static Node* findLeafToRightFromIntersection(Node* node)
+	{
+		assert(!node->isLeaf());
+		if (node == nullptr)
+			return nullptr;
+		node = node->right;
+		while (!node->isLeaf())
+			node = node->left;
+		return node;
+	}
+
 	constexpr static Node* findLeafToLeft(Node* node)
 	{
 		assert(node->isLeaf());
-		auto [res, _] = findIntersectionWithLeftLeaf(node);
-		if (res == nullptr)
-			return nullptr;
-		res = res->left;
-		while (!res->isLeaf())
-			res = res->right;
-		return res;
+		const auto [intersection, _] = findIntersectionWithLeftLeaf(node);
+		return findLeafToLeftFromIntersection(intersection);
 	}
 
 	constexpr static Node* findLeafToRight(Node* node)
 	{
 		assert(node->isLeaf());
-		auto [res, _] = findIntersectionWithRightLeaf(node);
-		if (res == nullptr)
-			return nullptr;
-		res = res->right;
-		while (!res->isLeaf())
-			res = res->left;
-		return res;
+		const auto [intersection, _] = findIntersectionWithRightLeaf(node);
+		return findLeafToRightFromIntersection(intersection);
 	}
 
 	constexpr bool empty() const
@@ -799,8 +811,10 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 		{
 			dcel.vertices.push_back({ ev.center, 0 }); // TODO: 0
 			const auto arcToRemove = ev.leaf;
-			const auto left = beachLine.findLeafToLeft(arcToRemove);
-			const auto right = beachLine.findLeafToRight(arcToRemove);
+			const auto leftIntersection = get<0>(beachLine.findIntersectionWithLeftLeaf(arcToRemove));
+			const auto rightIntersection = get<0>(beachLine.findIntersectionWithRightLeaf(arcToRemove));
+			const auto left = beachLine.findLeafToLeftFromIntersection(leftIntersection);
+			const auto right = beachLine.findLeafToRightFromIntersection(rightIntersection);
 			assert(left != nullptr);
 			assert(right != nullptr);
 			assert(arcToRemove->p != left->p);
@@ -816,9 +830,6 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 				right->circleEventId = -1;
 			}
 
-			// TODO: findLeaf and findIntersection.
-			const auto leftIntersection = get<0>(beachLine.findIntersectionWithRightLeaf(left));
-			const auto rightIntersection = get<0>(beachLine.findIntersectionWithLeftLeaf(right));
 			assert(leftIntersection->edgepq != -1);
 			assert(rightIntersection->edgepq != -1);
 
@@ -852,7 +863,6 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 				}
 				else
 				{
-					// TODO: Go to twin.
 					dcel.edges[edgepq + 1].vertexFrom = dcel.vertices.size() - 1;
 				}
 			};
