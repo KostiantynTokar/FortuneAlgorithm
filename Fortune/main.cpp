@@ -39,7 +39,8 @@ struct DoublyConnectedEdgeList
 
 		ptrdiff_t next = -1; // -1 if there is no next (infinite edge).
 		ptrdiff_t prev = -1;
-		size_t twin;
+
+		// NOTE: twin edges located in sequence in edges array, i.e., edges[2 * i] and edges[2 * i + 1] are twins.
 	};
 	vector<Edge> edges; // up to n^2 elements?
 	vector<Vertex> vertices;
@@ -793,11 +794,9 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 			assert(central->p != left->p);
 			const auto e1 = DoublyConnectedEdgeList::Edge{
 				.face = central->p,
-				.twin = dcel.edges.size() + 1
 			};
 			const auto e2 = DoublyConnectedEdgeList::Edge{
 				.face = left->p,
-				.twin = dcel.edges.size()
 			};
 			dcel.edges.push_back(e1);
 			dcel.edges.push_back(e2);
@@ -842,11 +841,9 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 
 			const auto e1 = DoublyConnectedEdgeList::Edge{
 				.face = left->p,
-				.twin = dcel.edges.size() + 1
 			};
 			const auto e2 = DoublyConnectedEdgeList::Edge{
 				.face = right->p,
-				.twin = dcel.edges.size()
 			};
 
 			const auto s1 = left->p;
@@ -945,7 +942,7 @@ int main()
 	for (size_t i{ 0 }; i < vor.edges.size(); i += 2)
 	{
 		const auto& e1 = vor.edges[i];
-		const auto& e2 = vor.edges[e1.twin];
+		const auto& e2 = vor.edges[i + 1];
 		if (e1.vertexFrom != -1 && e2.vertexFrom != -1)
 		{
 			edgeAs.push_back(e1.vertexFrom);
@@ -954,12 +951,13 @@ int main()
 		else
 		{
 			assert(e1.vertexFrom != -1 || e2.vertexFrom != -1);
-			const auto& e = e1.vertexFrom == -1 ? e2 : e1;
+			const auto& [e, eTwinInd] = e1.vertexFrom == -1 ? make_tuple(e2, i) : make_tuple(e1, i + 1);
 			// s1, s2 - sLeft, sRight.
 			const auto s1 = e.face;
-			const auto s2 = vor.edges[e.twin].face;
+			const auto s2 = vor.edges[eTwinInd].face;
+			const auto ePrevTwinInd = e.prev % 2 == 0 ? e.prev + 1 : e.prev - 1;
 			// bads - site opposite to the ray, sOpposite.
-			const auto bads = vor.edges[vor.edges[e.prev].twin].face;
+			const auto bads = vor.edges[ePrevTwinInd].face;
 			assert(s1 != s2 && s1 != bads && s2 != bads);
 			
 			const auto calcIsDirLeft = [](const Point& s1, const Point& s2, const Point& bads)
