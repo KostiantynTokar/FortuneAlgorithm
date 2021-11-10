@@ -875,39 +875,26 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 			}
 
 			// TODO: if this assertion about left orientation of a triangle (s1, bads, s2) is not true,
-			// then put this section in if, copy it to else block with swapping next and prev in lhs.
+			// then put body of setNextAndPrev in if block, copy it to else block with swapping next and prev in lhs.
 			assert((points[bads].x - points[s1].x) * (points[s2].y - points[s1].y) - (points[bads].y - points[s1].y) * (points[s2].x - points[s1].x) < 0);
 
-			if (dcel.edges[intersectionEdgepq].face == s1)
+			const auto setNextAndPrev = [&edges = dcel.edges](const ptrdiff_t centralEdgepq, const ptrdiff_t leftEdgepq, const ptrdiff_t rightEdgepq, const size_t sLeft, const size_t sRight)
 			{
-				dcel.edges[intersectionEdgepq].next = dcel.edges[leftIntersectionEdgepq].face == s1 ? leftIntersectionEdgepq : leftIntersectionEdgepq + 1;
-				dcel.edges[intersectionEdgepq + 1].prev = dcel.edges[rightIntersectionEdgepq].face == s2 ? rightIntersectionEdgepq : rightIntersectionEdgepq + 1;
-			}
-			else
-			{
-				dcel.edges[intersectionEdgepq + 1].next = dcel.edges[leftIntersectionEdgepq].face == s1 ? leftIntersectionEdgepq : leftIntersectionEdgepq + 1;
-				dcel.edges[intersectionEdgepq].prev = dcel.edges[rightIntersectionEdgepq].face == s2 ? rightIntersectionEdgepq : rightIntersectionEdgepq + 1;
-			}
-			if (dcel.edges[leftIntersectionEdgepq].face == bads)
-			{
-				dcel.edges[leftIntersectionEdgepq].next = dcel.edges[rightIntersectionEdgepq].face == bads ? rightIntersectionEdgepq : rightIntersectionEdgepq + 1;
-				dcel.edges[leftIntersectionEdgepq + 1].prev = dcel.edges[intersectionEdgepq].face == s1 ? intersectionEdgepq : intersectionEdgepq + 1;
-			}
-			else
-			{
-				dcel.edges[leftIntersectionEdgepq + 1].next = dcel.edges[rightIntersectionEdgepq].face == bads ? rightIntersectionEdgepq : rightIntersectionEdgepq + 1;
-				dcel.edges[leftIntersectionEdgepq].prev = dcel.edges[intersectionEdgepq].face == s1 ? intersectionEdgepq : intersectionEdgepq + 1;
-			}
-			if (dcel.edges[rightIntersectionEdgepq].face == s2)
-			{
-				dcel.edges[rightIntersectionEdgepq].next = dcel.edges[intersectionEdgepq].face == s2 ? intersectionEdgepq : intersectionEdgepq + 1;
-				dcel.edges[rightIntersectionEdgepq + 1].prev = dcel.edges[leftIntersectionEdgepq].face == bads ? leftIntersectionEdgepq : leftIntersectionEdgepq + 1;
-			}
-			else
-			{
-				dcel.edges[rightIntersectionEdgepq + 1].next = dcel.edges[intersectionEdgepq].face == s2 ? intersectionEdgepq : intersectionEdgepq + 1;
-				dcel.edges[rightIntersectionEdgepq].prev = dcel.edges[leftIntersectionEdgepq].face == bads ? leftIntersectionEdgepq : leftIntersectionEdgepq + 1;
-			}
+				if (edges[centralEdgepq].face == sLeft)
+				{
+					edges[centralEdgepq].next = edges[leftEdgepq].face == sLeft ? leftEdgepq : leftEdgepq + 1;
+					edges[centralEdgepq + 1].prev = edges[rightEdgepq].face == sRight ? rightEdgepq : rightEdgepq + 1;
+				}
+				else
+				{
+					edges[centralEdgepq + 1].next = edges[leftEdgepq].face == sLeft ? leftEdgepq : leftEdgepq + 1;
+					edges[centralEdgepq].prev = edges[rightEdgepq].face == sRight ? rightEdgepq : rightEdgepq + 1;
+				}
+			};
+
+			setNextAndPrev( intersectionEdgepq, leftIntersectionEdgepq, rightIntersectionEdgepq, s1, s2 );
+			setNextAndPrev( leftIntersectionEdgepq, rightIntersectionEdgepq, intersectionEdgepq, bads, s1 );
+			setNextAndPrev( rightIntersectionEdgepq, intersectionEdgepq, leftIntersectionEdgepq, s2, bads );
 
 			createCircleEvents(ev.y, left, intersection, right, left, intersection, right);
 		}
