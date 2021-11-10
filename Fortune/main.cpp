@@ -358,7 +358,7 @@ struct BeachLine
 		return node;
 	}
 
-	constexpr static Node* findLeafToLeft(Node* node)
+	/*constexpr static Node* findLeafToLeft(Node* node)
 	{
 		assert(node->isLeaf());
 		const auto [intersection, _] = findIntersectionWithLeftLeaf(node);
@@ -370,7 +370,7 @@ struct BeachLine
 		assert(node->isLeaf());
 		const auto [intersection, _] = findIntersectionWithRightLeaf(node);
 		return findLeafToRightFromIntersection(intersection);
-	}
+	}*/
 
 	constexpr bool empty() const
 	{
@@ -472,11 +472,6 @@ struct BeachLine
 		return false;
 	}
 
-	constexpr void rebalanceSubTree(Node* node)
-	{
-		rebalanceSubTree(node, node->parent);
-	}
-
 	constexpr void trustedReplaceNode(Node* oldNode, Node* newNode, Node* parent)
 	{
 		assert(parent);
@@ -498,11 +493,6 @@ struct BeachLine
 			root = newNode;
 			root->parent = nullptr;
 		}
-	}
-
-	constexpr void replaceNode(Node* oldNode, Node* newNode)
-	{
-		replaceNode(oldNode, newNode, oldNode->parent);
 	}
 
 	constexpr void deleteRecursive(Node* node)
