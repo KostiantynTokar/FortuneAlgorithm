@@ -725,11 +725,7 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 {
 	struct Edge
 	{
-		size_t a;
-		size_t b;
 		ptrdiff_t vertexFrom = -1; // -1 for edges that starts from infinite.
-		bool aEmpty = true;
-		bool bEmpty = true;
 
 		size_t site1;
 		size_t site2;
@@ -847,54 +843,10 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 			tmpEdges[leftIntersection->edgepq + 1].site1 = left->p;
 			tmpEdges[leftIntersection->edgepq + 1].site2 = arcToRemove->p;
 
-			if (tmpEdges[leftIntersection->edgepq].aEmpty)
-			{
-				tmpEdges[leftIntersection->edgepq].a = dcel.vertices.size() - 1;
-				tmpEdges[leftIntersection->edgepq].aEmpty = false;
-			}
-			else
-			{
-				tmpEdges[leftIntersection->edgepq].b = dcel.vertices.size() - 1;
-				tmpEdges[leftIntersection->edgepq].bEmpty = false;
-			}
-
-			if (tmpEdges[leftIntersection->edgepq + 1].aEmpty)
-			{
-				tmpEdges[leftIntersection->edgepq + 1].a = dcel.vertices.size() - 1;
-				tmpEdges[leftIntersection->edgepq + 1].aEmpty = false;
-			}
-			else
-			{
-				tmpEdges[leftIntersection->edgepq + 1].b = dcel.vertices.size() - 1;
-				tmpEdges[leftIntersection->edgepq + 1].bEmpty = false;
-			}
-
 			tmpEdges[rightIntersection->edgepq].site1 = arcToRemove->p;
 			tmpEdges[rightIntersection->edgepq].site2 = right->p;
 			tmpEdges[rightIntersection->edgepq + 1].site1 = arcToRemove->p;
 			tmpEdges[rightIntersection->edgepq + 1].site2 = right->p;
-
-			if (tmpEdges[rightIntersection->edgepq].aEmpty)
-			{
-				tmpEdges[rightIntersection->edgepq].a = dcel.vertices.size() - 1;
-				tmpEdges[rightIntersection->edgepq].aEmpty = false;
-			}
-			else
-			{
-				tmpEdges[rightIntersection->edgepq].b = dcel.vertices.size() - 1;
-				tmpEdges[rightIntersection->edgepq].bEmpty = false;
-			}
-
-			if (tmpEdges[rightIntersection->edgepq + 1].aEmpty)
-			{
-				tmpEdges[rightIntersection->edgepq + 1].a = dcel.vertices.size() - 1;
-				tmpEdges[rightIntersection->edgepq + 1].aEmpty = false;
-			}
-			else
-			{
-				tmpEdges[rightIntersection->edgepq + 1].b = dcel.vertices.size() - 1;
-				tmpEdges[rightIntersection->edgepq + 1].bEmpty = false;
-			}
 
 			const auto bads = arcToRemove->p;
 			const auto leftIntersectionEdgepq = leftIntersection->edgepq;
@@ -902,15 +854,11 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 			const auto intersection = beachLine.removeArc(arcToRemove);
 
 			const auto e1 = Edge{
-				.a = dcel.vertices.size() - 1, 
-				.aEmpty = false,
 				.site1 = left->p, .site2 = right->p,
 				.face = left->p,
 				.twin = tmpEdges.size() + 1
 			};
 			const auto e2 = Edge{
-				.a = dcel.vertices.size() - 1, 
-				.aEmpty = false,
 				.site1 = left->p, .site2 = right->p,
 				.face = right->p,
 				.twin = tmpEdges.size()
