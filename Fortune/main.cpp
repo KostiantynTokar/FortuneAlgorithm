@@ -722,7 +722,6 @@ bool isConvergent(const double y, const Point& a1, const Point& a2, const Point&
 			return false;
 	}
 
-//#ifdef _DEBUG
 	const auto site1 = a1;
 	const auto site2 = a2;
 	const auto site3 = ((b1.x == a1.x && b1.y == a1.y) || (b1.x == a2.x && b1.y == a2.y)) ? b2 : b1;
@@ -730,9 +729,6 @@ bool isConvergent(const double y, const Point& a1, const Point& a2, const Point&
 	{
 		return false;
 	}
-	// TODO: is it correct assertion?
-	assert(y >= get<0>(circleBottomPoint(site1, site2, site3)));
-//#endif
 
 	return true;
 }
@@ -792,20 +788,10 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 				queue.removeById(intersectedArcEventId);
 			}
 			assert(central->p != left->p);
-			const auto e1 = DoublyConnectedEdgeList::Edge{
-				.face = central->p,
-			};
-			const auto e2 = DoublyConnectedEdgeList::Edge{
-				.face = left->p,
-			};
-			dcel.edges.push_back(e1);
-			dcel.edges.push_back(e2);
-			dcel.faces[central->p] = DoublyConnectedEdgeList::Face{
-				.edge = dcel.edges.size() - 2
-			};
-			dcel.faces[left->p] = DoublyConnectedEdgeList::Face{
-				.edge = dcel.edges.size() - 1
-			};
+			dcel.edges.push_back({ .face = central->p });
+			dcel.edges.push_back({ .face = left->p });
+			dcel.faces[central->p] = { .edge = dcel.edges.size() - 2 };
+			dcel.faces[left->p] = { .edge = dcel.edges.size() - 1 };
 			centralRight->edgepq = leftCentral->edgepq = dcel.edges.size() - 2;
 			createCircleEvents(ev.y, left, leftCentral, central, central, centralRight, right);
 		}
@@ -839,18 +825,11 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 			const auto rightIntersectionEdgepq = rightIntersection->edgepq;
 			const auto intersection = beachLine.removeArc(arcToRemove);
 
-			const auto e1 = DoublyConnectedEdgeList::Edge{
-				.face = left->p,
-			};
-			const auto e2 = DoublyConnectedEdgeList::Edge{
-				.face = right->p,
-			};
-
 			const auto s1 = left->p;
 			const auto s2 = right->p;
 
-			dcel.edges.push_back(e1);
-			dcel.edges.push_back(e2);
+			dcel.edges.push_back({ .face = s1 });
+			dcel.edges.push_back({ .face = s2 });
 
 			const auto intersectionEdgepq = intersection->edgepq = dcel.edges.size() - 2;
 
