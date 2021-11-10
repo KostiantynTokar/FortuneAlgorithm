@@ -991,6 +991,7 @@ int main()
 	vector<size_t> delaunayEdgeBs;
 	for (size_t i{ 0 }; i != vor.edges.size(); i += 2)
 	{
+		// vor.edges[i + 1] is a twin edge of an vor.edges[i].
 		delaunayEdgeAs.push_back(vor.edges[i].face);
 		delaunayEdgeBs.push_back(vor.edges[i + 1].face);
 	}
