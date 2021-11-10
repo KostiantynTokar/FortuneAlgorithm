@@ -32,31 +32,17 @@ struct DoublyConnectedEdgeList
 	};
 	struct Edge
 	{
-		size_t a;
-		size_t b;
 		ptrdiff_t vertexFrom = -1; // -1 for edges that starts from infinite.
-		bool aEmpty = true;
-		bool bEmpty = true;
 		
-		size_t site1;
-		size_t site2;
 		size_t face;
 
 		ptrdiff_t next = -1; // -1 if there is no next (infinite edge).
 		ptrdiff_t prev = -1;
 		size_t twin;
-
-		bool isDirLeft; // from -inf to vertex.
-	};
-	struct DelaunayEdge
-	{
-		size_t a;
-		size_t b;
 	};
 	vector<Edge> edges; // up to n^2 elements?
 	vector<Vertex> vertices;
 	vector<Face> faces;
-	vector<DelaunayEdge> delaunayEdges;
 };
 
 // Returns x-coordinate of left intersection if site1.x <= site2.x and x-coordinate of right intersection otherwise.
@@ -770,7 +756,27 @@ bool isConvergent(const double y, const Point& a1, const Point& a2, const Point&
 
 DoublyConnectedEdgeList fortune(const vector<Point>& points)
 {
+	struct Edge
+	{
+		size_t a;
+		size_t b;
+		ptrdiff_t vertexFrom = -1; // -1 for edges that starts from infinite.
+		bool aEmpty = true;
+		bool bEmpty = true;
+
+		size_t site1;
+		size_t site2;
+		size_t face;
+
+		ptrdiff_t next = -1; // -1 if there is no next (infinite edge).
+		ptrdiff_t prev = -1;
+		size_t twin;
+
+		bool isDirLeft; // from -inf to vertex.
+	};
+
 	auto dcel = DoublyConnectedEdgeList{};
+	vector<Edge> tmpEdges;
 
 	dcel.faces.resize(points.size());
 
@@ -823,25 +829,25 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 				queue.removeById(intersectedArcEventId);
 			}
 			assert(central->p != left->p);
-			const auto e1 = DoublyConnectedEdgeList::Edge{
+			const auto e1 = Edge{
 				.site1 = central->p, .site2 = left->p,
 				.face = central->p,
-				.twin = dcel.edges.size() + 1
+				.twin = tmpEdges.size() + 1
 			};
-			const auto e2 = DoublyConnectedEdgeList::Edge{
+			const auto e2 = Edge{
 				.site1 = central->p, .site2 = left->p,
 				.face = left->p,
-				.twin = dcel.edges.size()
+				.twin = tmpEdges.size()
 			};
-			dcel.edges.push_back(e1);
-			dcel.edges.push_back(e2);
+			tmpEdges.push_back(e1);
+			tmpEdges.push_back(e2);
 			dcel.faces[central->p] = DoublyConnectedEdgeList::Face{
-				.edge = dcel.edges.size() - 2
+				.edge = tmpEdges.size() - 2
 			};
 			dcel.faces[left->p] = DoublyConnectedEdgeList::Face{
-				.edge = dcel.edges.size() - 1
+				.edge = tmpEdges.size() - 1
 			};
-			centralRight->edgepq = leftCentral->edgepq = dcel.edges.size() - 2;
+			centralRight->edgepq = leftCentral->edgepq = tmpEdges.size() - 2;
 			createCircleEvents(ev.y, left, leftCentral, central, central, centralRight, right);
 		}
 		break; case Event::Type::circle:
@@ -886,72 +892,72 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 				return (a * (middleX + 1) + b * middleY + c) * dist > 0;
 			};
 
-			dcel.edges[leftIntersection->edgepq].site1 = left->p;
-			dcel.edges[leftIntersection->edgepq].site2 = arcToRemove->p;
-			dcel.edges[leftIntersection->edgepq + 1].site1 = left->p;
-			dcel.edges[leftIntersection->edgepq + 1].site2 = arcToRemove->p;
-			dcel.edges[leftIntersection->edgepq].isDirLeft = calcIsDirLeft(
+			tmpEdges[leftIntersection->edgepq].site1 = left->p;
+			tmpEdges[leftIntersection->edgepq].site2 = arcToRemove->p;
+			tmpEdges[leftIntersection->edgepq + 1].site1 = left->p;
+			tmpEdges[leftIntersection->edgepq + 1].site2 = arcToRemove->p;
+			tmpEdges[leftIntersection->edgepq].isDirLeft = calcIsDirLeft(
 				points[left->p],
 				points[arcToRemove->p],
 				points[right->p]
 			);
 			// NOTE: edgepq + 1 is a twin of edgepq.
-			dcel.edges[leftIntersection->edgepq + 1].isDirLeft = dcel.edges[leftIntersection->edgepq].isDirLeft;
+			tmpEdges[leftIntersection->edgepq + 1].isDirLeft = tmpEdges[leftIntersection->edgepq].isDirLeft;
 
-			if (dcel.edges[leftIntersection->edgepq].aEmpty)
+			if (tmpEdges[leftIntersection->edgepq].aEmpty)
 			{
-				dcel.edges[leftIntersection->edgepq].a = dcel.vertices.size() - 1;
-				dcel.edges[leftIntersection->edgepq].aEmpty = false;
+				tmpEdges[leftIntersection->edgepq].a = dcel.vertices.size() - 1;
+				tmpEdges[leftIntersection->edgepq].aEmpty = false;
 			}
 			else
 			{
-				dcel.edges[leftIntersection->edgepq].b = dcel.vertices.size() - 1;
-				dcel.edges[leftIntersection->edgepq].bEmpty = false;
+				tmpEdges[leftIntersection->edgepq].b = dcel.vertices.size() - 1;
+				tmpEdges[leftIntersection->edgepq].bEmpty = false;
 			}
 
-			if (dcel.edges[leftIntersection->edgepq + 1].aEmpty)
+			if (tmpEdges[leftIntersection->edgepq + 1].aEmpty)
 			{
-				dcel.edges[leftIntersection->edgepq + 1].a = dcel.vertices.size() - 1;
-				dcel.edges[leftIntersection->edgepq + 1].aEmpty = false;
+				tmpEdges[leftIntersection->edgepq + 1].a = dcel.vertices.size() - 1;
+				tmpEdges[leftIntersection->edgepq + 1].aEmpty = false;
 			}
 			else
 			{
-				dcel.edges[leftIntersection->edgepq + 1].b = dcel.vertices.size() - 1;
-				dcel.edges[leftIntersection->edgepq + 1].bEmpty = false;
+				tmpEdges[leftIntersection->edgepq + 1].b = dcel.vertices.size() - 1;
+				tmpEdges[leftIntersection->edgepq + 1].bEmpty = false;
 			}
 
-			dcel.edges[rightIntersection->edgepq].site1 = arcToRemove->p;
-			dcel.edges[rightIntersection->edgepq].site2 = right->p;
-			dcel.edges[rightIntersection->edgepq + 1].site1 = arcToRemove->p;
-			dcel.edges[rightIntersection->edgepq + 1].site2 = right->p;
-			dcel.edges[rightIntersection->edgepq].isDirLeft = calcIsDirLeft(
+			tmpEdges[rightIntersection->edgepq].site1 = arcToRemove->p;
+			tmpEdges[rightIntersection->edgepq].site2 = right->p;
+			tmpEdges[rightIntersection->edgepq + 1].site1 = arcToRemove->p;
+			tmpEdges[rightIntersection->edgepq + 1].site2 = right->p;
+			tmpEdges[rightIntersection->edgepq].isDirLeft = calcIsDirLeft(
 				points[arcToRemove->p],
 				points[right->p],
 				points[left->p]
 			);
 			
-			dcel.edges[rightIntersection->edgepq + 1].isDirLeft = dcel.edges[rightIntersection->edgepq].isDirLeft;
+			tmpEdges[rightIntersection->edgepq + 1].isDirLeft = tmpEdges[rightIntersection->edgepq].isDirLeft;
 
-			if (dcel.edges[rightIntersection->edgepq].aEmpty)
+			if (tmpEdges[rightIntersection->edgepq].aEmpty)
 			{
-				dcel.edges[rightIntersection->edgepq].a = dcel.vertices.size() - 1;
-				dcel.edges[rightIntersection->edgepq].aEmpty = false;
+				tmpEdges[rightIntersection->edgepq].a = dcel.vertices.size() - 1;
+				tmpEdges[rightIntersection->edgepq].aEmpty = false;
 			}
 			else
 			{
-				dcel.edges[rightIntersection->edgepq].b = dcel.vertices.size() - 1;
-				dcel.edges[rightIntersection->edgepq].bEmpty = false;
+				tmpEdges[rightIntersection->edgepq].b = dcel.vertices.size() - 1;
+				tmpEdges[rightIntersection->edgepq].bEmpty = false;
 			}
 
-			if (dcel.edges[rightIntersection->edgepq + 1].aEmpty)
+			if (tmpEdges[rightIntersection->edgepq + 1].aEmpty)
 			{
-				dcel.edges[rightIntersection->edgepq + 1].a = dcel.vertices.size() - 1;
-				dcel.edges[rightIntersection->edgepq + 1].aEmpty = false;
+				tmpEdges[rightIntersection->edgepq + 1].a = dcel.vertices.size() - 1;
+				tmpEdges[rightIntersection->edgepq + 1].aEmpty = false;
 			}
 			else
 			{
-				dcel.edges[rightIntersection->edgepq + 1].b = dcel.vertices.size() - 1;
-				dcel.edges[rightIntersection->edgepq + 1].bEmpty = false;
+				tmpEdges[rightIntersection->edgepq + 1].b = dcel.vertices.size() - 1;
+				tmpEdges[rightIntersection->edgepq + 1].bEmpty = false;
 			}
 
 			const auto bads = arcToRemove->p;
@@ -959,58 +965,58 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 			const auto rightIntersectionEdgepq = rightIntersection->edgepq;
 			const auto intersection = beachLine.removeArc(arcToRemove);
 
-			const auto e1 = DoublyConnectedEdgeList::Edge{
+			const auto e1 = Edge{
 				.a = dcel.vertices.size() - 1, 
 				.aEmpty = false,
 				.site1 = left->p, .site2 = right->p,
 				.face = left->p,
-				.twin = dcel.edges.size() + 1
+				.twin = tmpEdges.size() + 1
 			};
-			const auto e2 = DoublyConnectedEdgeList::Edge{
+			const auto e2 = Edge{
 				.a = dcel.vertices.size() - 1, 
 				.aEmpty = false,
 				.site1 = left->p, .site2 = right->p,
 				.face = right->p,
-				.twin = dcel.edges.size()
+				.twin = tmpEdges.size()
 			};
 
 			const auto s1 = left->p;
 			const auto s2 = right->p;
 
-			dcel.edges.push_back(e1);
-			dcel.edges.push_back(e2);
+			tmpEdges.push_back(e1);
+			tmpEdges.push_back(e2);
 
-			const auto intersectionEdgepq = intersection->edgepq = dcel.edges.size() - 2;
-			dcel.edges[intersection->edgepq].isDirLeft = calcIsDirLeft(points[s1], points[s2], points[bads]);
-			dcel.edges[intersection->edgepq + 1].isDirLeft = dcel.edges[intersection->edgepq].isDirLeft;
+			const auto intersectionEdgepq = intersection->edgepq = tmpEdges.size() - 2;
+			tmpEdges[intersection->edgepq].isDirLeft = calcIsDirLeft(points[s1], points[s2], points[bads]);
+			tmpEdges[intersection->edgepq + 1].isDirLeft = tmpEdges[intersection->edgepq].isDirLeft;
 			
-			if (dcel.edges[leftIntersectionEdgepq].face == s1)
+			if (tmpEdges[leftIntersectionEdgepq].face == s1)
 			{
-				dcel.edges[leftIntersectionEdgepq].vertexFrom = dcel.vertices.size() - 1;
+				tmpEdges[leftIntersectionEdgepq].vertexFrom = dcel.vertices.size() - 1;
 			}
 			else
 			{
 				// TODO: Go to twin.
-				dcel.edges[leftIntersectionEdgepq + 1].vertexFrom = dcel.vertices.size() - 1;
+				tmpEdges[leftIntersectionEdgepq + 1].vertexFrom = dcel.vertices.size() - 1;
 			}
 
-			if (dcel.edges[rightIntersectionEdgepq].face == bads)
+			if (tmpEdges[rightIntersectionEdgepq].face == bads)
 			{
-				dcel.edges[rightIntersectionEdgepq].vertexFrom = dcel.vertices.size() - 1;
+				tmpEdges[rightIntersectionEdgepq].vertexFrom = dcel.vertices.size() - 1;
 			}
 			else
 			{
-				dcel.edges[rightIntersectionEdgepq + 1].vertexFrom = dcel.vertices.size() - 1;
+				tmpEdges[rightIntersectionEdgepq + 1].vertexFrom = dcel.vertices.size() - 1;
 			}
 			
-			if (dcel.edges[intersectionEdgepq].face == s2)
+			if (tmpEdges[intersectionEdgepq].face == s2)
 			{
-				dcel.edges[intersectionEdgepq].vertexFrom = dcel.vertices.size() - 1;
+				tmpEdges[intersectionEdgepq].vertexFrom = dcel.vertices.size() - 1;
 				dcel.vertices[dcel.vertices.size() - 1].edge = intersectionEdgepq;
 			}
 			else
 			{
-				dcel.edges[intersectionEdgepq + 1].vertexFrom = dcel.vertices.size() - 1;
+				tmpEdges[intersectionEdgepq + 1].vertexFrom = dcel.vertices.size() - 1;
 				dcel.vertices[dcel.vertices.size() - 1].edge = intersectionEdgepq + 1;
 			}
 
@@ -1022,81 +1028,82 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 			const bool leftOriented = triangle_area( points[s1], points[bads], points[s2]) < 0;
 			assert(leftOriented);
 
-			if (leftOriented)
-			{
-				if (dcel.edges[intersectionEdgepq].face == s1)
+			//if (leftOriented)
+			//{
+				if (tmpEdges[intersectionEdgepq].face == s1)
 				{
-					dcel.edges[intersectionEdgepq].next = dcel.edges[leftIntersectionEdgepq].face == s1 ? leftIntersectionEdgepq : leftIntersectionEdgepq + 1;
-					dcel.edges[intersectionEdgepq + 1].prev = dcel.edges[rightIntersectionEdgepq].face == s2 ? rightIntersectionEdgepq : rightIntersectionEdgepq + 1;
+					tmpEdges[intersectionEdgepq].next = tmpEdges[leftIntersectionEdgepq].face == s1 ? leftIntersectionEdgepq : leftIntersectionEdgepq + 1;
+					tmpEdges[intersectionEdgepq + 1].prev = tmpEdges[rightIntersectionEdgepq].face == s2 ? rightIntersectionEdgepq : rightIntersectionEdgepq + 1;
 				}
 				else
 				{
-					dcel.edges[intersectionEdgepq + 1].next = dcel.edges[leftIntersectionEdgepq].face == s1 ? leftIntersectionEdgepq : leftIntersectionEdgepq + 1;
-					dcel.edges[intersectionEdgepq].prev = dcel.edges[rightIntersectionEdgepq].face == s2 ? rightIntersectionEdgepq : rightIntersectionEdgepq + 1;
+					tmpEdges[intersectionEdgepq + 1].next = tmpEdges[leftIntersectionEdgepq].face == s1 ? leftIntersectionEdgepq : leftIntersectionEdgepq + 1;
+					tmpEdges[intersectionEdgepq].prev = tmpEdges[rightIntersectionEdgepq].face == s2 ? rightIntersectionEdgepq : rightIntersectionEdgepq + 1;
 				}
-				if (dcel.edges[leftIntersectionEdgepq].face == bads)
+				if (tmpEdges[leftIntersectionEdgepq].face == bads)
 				{
-					dcel.edges[leftIntersectionEdgepq].next = dcel.edges[rightIntersectionEdgepq].face == bads ? rightIntersectionEdgepq : rightIntersectionEdgepq + 1;
-					dcel.edges[leftIntersectionEdgepq + 1].prev = dcel.edges[intersectionEdgepq].face == s1 ? intersectionEdgepq : intersectionEdgepq + 1;
+					tmpEdges[leftIntersectionEdgepq].next = tmpEdges[rightIntersectionEdgepq].face == bads ? rightIntersectionEdgepq : rightIntersectionEdgepq + 1;
+					tmpEdges[leftIntersectionEdgepq + 1].prev = tmpEdges[intersectionEdgepq].face == s1 ? intersectionEdgepq : intersectionEdgepq + 1;
 				}
 				else
 				{
-					dcel.edges[leftIntersectionEdgepq + 1].next = dcel.edges[rightIntersectionEdgepq].face == bads ? rightIntersectionEdgepq : rightIntersectionEdgepq + 1;
-					dcel.edges[leftIntersectionEdgepq].prev = dcel.edges[intersectionEdgepq].face == s1 ? intersectionEdgepq : intersectionEdgepq + 1;
+					tmpEdges[leftIntersectionEdgepq + 1].next = tmpEdges[rightIntersectionEdgepq].face == bads ? rightIntersectionEdgepq : rightIntersectionEdgepq + 1;
+					tmpEdges[leftIntersectionEdgepq].prev = tmpEdges[intersectionEdgepq].face == s1 ? intersectionEdgepq : intersectionEdgepq + 1;
 				}
-				if (dcel.edges[rightIntersectionEdgepq].face == s2)
+				if (tmpEdges[rightIntersectionEdgepq].face == s2)
 				{
-					dcel.edges[rightIntersectionEdgepq].next = dcel.edges[intersectionEdgepq].face == s2 ? intersectionEdgepq : intersectionEdgepq + 1;
-					dcel.edges[rightIntersectionEdgepq + 1].prev = dcel.edges[leftIntersectionEdgepq].face == bads ? leftIntersectionEdgepq : leftIntersectionEdgepq + 1;
+					tmpEdges[rightIntersectionEdgepq].next = tmpEdges[intersectionEdgepq].face == s2 ? intersectionEdgepq : intersectionEdgepq + 1;
+					tmpEdges[rightIntersectionEdgepq + 1].prev = tmpEdges[leftIntersectionEdgepq].face == bads ? leftIntersectionEdgepq : leftIntersectionEdgepq + 1;
 				}
 				else
 				{
-					dcel.edges[rightIntersectionEdgepq + 1].next = dcel.edges[intersectionEdgepq].face == s2 ? intersectionEdgepq : intersectionEdgepq + 1;
-					dcel.edges[rightIntersectionEdgepq].prev = dcel.edges[leftIntersectionEdgepq].face == bads ? leftIntersectionEdgepq : leftIntersectionEdgepq + 1;
+					tmpEdges[rightIntersectionEdgepq + 1].next = tmpEdges[intersectionEdgepq].face == s2 ? intersectionEdgepq : intersectionEdgepq + 1;
+					tmpEdges[rightIntersectionEdgepq].prev = tmpEdges[leftIntersectionEdgepq].face == bads ? leftIntersectionEdgepq : leftIntersectionEdgepq + 1;
 				}
-			}
-			else
-			{
-				if (dcel.edges[intersectionEdgepq].face == s1)
-				{
-					dcel.edges[intersectionEdgepq].prev = dcel.edges[leftIntersectionEdgepq].face == s1 ? leftIntersectionEdgepq : leftIntersectionEdgepq + 1;
-					dcel.edges[intersectionEdgepq + 1].next = dcel.edges[rightIntersectionEdgepq].face == s2 ? rightIntersectionEdgepq : rightIntersectionEdgepq + 1;
-				}
-				else
-				{
-					dcel.edges[intersectionEdgepq + 1].prev = dcel.edges[leftIntersectionEdgepq].face == s1 ? leftIntersectionEdgepq : leftIntersectionEdgepq + 1;
-					dcel.edges[intersectionEdgepq].next = dcel.edges[rightIntersectionEdgepq].face == s2 ? rightIntersectionEdgepq : rightIntersectionEdgepq + 1;
-				}
-				if (dcel.edges[leftIntersectionEdgepq].face == bads)
-				{
-					dcel.edges[leftIntersectionEdgepq].prev = dcel.edges[rightIntersectionEdgepq].face == bads ? rightIntersectionEdgepq : rightIntersectionEdgepq + 1;
-					dcel.edges[leftIntersectionEdgepq + 1].next = dcel.edges[intersectionEdgepq].face == s1 ? intersectionEdgepq : intersectionEdgepq + 1;
-				}
-				else
-				{
-					dcel.edges[leftIntersectionEdgepq + 1].prev = dcel.edges[rightIntersectionEdgepq].face == bads ? rightIntersectionEdgepq : rightIntersectionEdgepq + 1;
-					dcel.edges[leftIntersectionEdgepq].next = dcel.edges[intersectionEdgepq].face == s1 ? intersectionEdgepq : intersectionEdgepq + 1;
-				}
-				if (dcel.edges[rightIntersectionEdgepq].face == s2)
-				{
-					dcel.edges[rightIntersectionEdgepq].prev = dcel.edges[intersectionEdgepq].face == s2 ? intersectionEdgepq : intersectionEdgepq + 1;
-					dcel.edges[rightIntersectionEdgepq + 1].next = dcel.edges[leftIntersectionEdgepq].face == bads ? leftIntersectionEdgepq : leftIntersectionEdgepq + 1;
-				}
-				else
-				{
-					dcel.edges[rightIntersectionEdgepq + 1].prev = dcel.edges[intersectionEdgepq].face == s2 ? intersectionEdgepq : intersectionEdgepq + 1;
-					dcel.edges[rightIntersectionEdgepq].next = dcel.edges[leftIntersectionEdgepq].face == bads ? leftIntersectionEdgepq : leftIntersectionEdgepq + 1;
-				}
-			}
+			//}
+			//else
+			//{
+			//	if (tmpEdges[intersectionEdgepq].face == s1)
+			//	{
+			//		tmpEdges[intersectionEdgepq].prev = tmpEdges[leftIntersectionEdgepq].face == s1 ? leftIntersectionEdgepq : leftIntersectionEdgepq + 1;
+			//		tmpEdges[intersectionEdgepq + 1].next = tmpEdges[rightIntersectionEdgepq].face == s2 ? rightIntersectionEdgepq : rightIntersectionEdgepq + 1;
+			//	}
+			//	else
+			//	{
+			//		tmpEdges[intersectionEdgepq + 1].prev = tmpEdges[leftIntersectionEdgepq].face == s1 ? leftIntersectionEdgepq : leftIntersectionEdgepq + 1;
+			//		tmpEdges[intersectionEdgepq].next = tmpEdges[rightIntersectionEdgepq].face == s2 ? rightIntersectionEdgepq : rightIntersectionEdgepq + 1;
+			//	}
+			//	if (tmpEdges[leftIntersectionEdgepq].face == bads)
+			//	{
+			//		tmpEdges[leftIntersectionEdgepq].prev = tmpEdges[rightIntersectionEdgepq].face == bads ? rightIntersectionEdgepq : rightIntersectionEdgepq + 1;
+			//		tmpEdges[leftIntersectionEdgepq + 1].next = tmpEdges[intersectionEdgepq].face == s1 ? intersectionEdgepq : intersectionEdgepq + 1;
+			//	}
+			//	else
+			//	{
+			//		tmpEdges[leftIntersectionEdgepq + 1].prev = tmpEdges[rightIntersectionEdgepq].face == bads ? rightIntersectionEdgepq : rightIntersectionEdgepq + 1;
+			//		tmpEdges[leftIntersectionEdgepq].next = tmpEdges[intersectionEdgepq].face == s1 ? intersectionEdgepq : intersectionEdgepq + 1;
+			//	}
+			//	if (tmpEdges[rightIntersectionEdgepq].face == s2)
+			//	{
+			//		tmpEdges[rightIntersectionEdgepq].prev = tmpEdges[intersectionEdgepq].face == s2 ? intersectionEdgepq : intersectionEdgepq + 1;
+			//		tmpEdges[rightIntersectionEdgepq + 1].next = tmpEdges[leftIntersectionEdgepq].face == bads ? leftIntersectionEdgepq : leftIntersectionEdgepq + 1;
+			//	}
+			//	else
+			//	{
+			//		tmpEdges[rightIntersectionEdgepq + 1].prev = tmpEdges[intersectionEdgepq].face == s2 ? intersectionEdgepq : intersectionEdgepq + 1;
+			//		tmpEdges[rightIntersectionEdgepq].next = tmpEdges[leftIntersectionEdgepq].face == bads ? leftIntersectionEdgepq : leftIntersectionEdgepq + 1;
+			//	}
+			//}
 
 			createCircleEvents(ev.y, left, intersection, right, left, intersection, right);
 		}
 		}
 	}
 
-	for (const auto& e : dcel.edges)
+	dcel.edges.reserve(tmpEdges.size());
+	for (const auto& e : tmpEdges)
 	{
-		dcel.delaunayEdges.push_back({ e.site1, e.site2 });
+		dcel.edges.push_back({ .vertexFrom = e.vertexFrom, .face = e.face, .next = e.next, .prev = e.prev, .twin = e.twin });
 	}
 
 	return dcel;
@@ -1122,7 +1129,60 @@ int main()
 	vector<double> infEdgeAYs;
 	vector<double> infEdgeBXs;
 	vector<double> infEdgeBYs;
-	// TODO: handle edges withos vertexFrom, use twin.
+	for (size_t i{ 0 }; i < vor.edges.size(); i += 2)
+	{
+		const auto& e1 = vor.edges[i];
+		const auto& e2 = vor.edges[e1.twin];
+		if (e1.vertexFrom != -1 && e2.vertexFrom != -1)
+		{
+			edgeAs.push_back(e1.vertexFrom);
+			edgeBs.push_back(e2.vertexFrom);
+		}
+		else
+		{
+			assert(e1.vertexFrom != -1 || e2.vertexFrom != -1);
+			const auto& e = e1.vertexFrom == -1 ? e2 : e1;
+			// s1, s2 - sLeft, sRight.
+			const auto s1 = e.face;
+			const auto s2 = vor.edges[e.twin].face;
+			// bads - site opposite to the ray, sOpposite.
+			const auto bads = vor.edges[vor.edges[e.prev].twin].face;
+			assert(s1 != s2 && s1 != bads && s2 != bads);
+			
+			const auto calcIsDirLeft = [](const Point& s1, const Point& s2, const Point& bads)
+			{
+				// ax + by + c = 0
+				const auto a = -(s2.y - s1.y) / (s2.x - s1.x);
+				const auto b = 1.0;
+				const auto c = -(s2.y + a * s2.x);
+
+				const auto dist = (a * bads.x + b * bads.y + c);
+
+				const auto middleX = (s2.x + s1.x) / 2;
+				const auto middleY = (s2.y + s1.y) / 2;
+
+				return (a * (middleX + 1) + b * middleY + c) * dist > 0;
+			};
+			const auto isDirLeft = calcIsDirLeft(points[s1], points[s2], points[bads]);
+
+			// Ray: y = m * x + f
+			const auto m = (points[s1].x - points[s2].x) / (points[s2].y - points[s1].y);
+			const auto f = -m * (points[s1].x + points[s2].x) / 2 + (points[s1].y + points[s2].y) / 2;
+			const auto& vertex = vor.vertices[e.vertexFrom];
+			infEdgeAXs.push_back(vertex.p.x);
+			infEdgeAYs.push_back(vertex.p.y);
+			if (isDirLeft)
+			{
+				infEdgeBXs.push_back(leftBorder);
+			}
+			else
+			{
+				infEdgeBXs.push_back(rightBorder);
+			}
+			infEdgeBYs.push_back(m * infEdgeBXs.back() + f);
+		}
+	}
+	//// TODO: handle edges withos vertexFrom, use twin.
 	//for (size_t i{ 0 }; i < vor.edges.size(); i += 2)
 	//{
 	//	const auto& e = vor.edges[i];
@@ -1150,40 +1210,40 @@ int main()
 	//		infEdgeBYs.push_back(m * infEdgeBXs.back() + f);
 	//	}
 	//}
-	ptrdiff_t startInd = 1;
-	auto eInd = startInd;
-	do
-	{
-		auto e = vor.edges[eInd];
-		assert(!e.aEmpty || !e.bEmpty);
-		if (!e.aEmpty && !e.bEmpty)
-		{
-			edgeAs.push_back(e.a);
-			edgeBs.push_back(e.b);
-		}
-		else
-		{
-			const auto m = (points[e.site1].x - points[e.site2].x) / (points[e.site2].y - points[e.site1].y);
-			const auto f = -m * (points[e.site1].x + points[e.site2].x) / 2 + (points[e.site1].y + points[e.site2].y) / 2;
-			const auto& vertex = vor.vertices[e.a];
-			infEdgeAXs.push_back(vertex.p.x);
-			infEdgeAYs.push_back(vertex.p.y);
-			if (e.isDirLeft)
-			{
-				infEdgeBXs.push_back(leftBorder);
-			}
-			else
-			{
-				infEdgeBXs.push_back(rightBorder);
-			}
-			infEdgeBYs.push_back(m * infEdgeBXs.back() + f);
-		}
-		eInd = e.prev;
-		if (eInd != -1)
-		{
-			assert(e.face == vor.edges[eInd].face);
-		}
-	} while (eInd != -1 && eInd != startInd);
+	//ptrdiff_t startInd = 1;
+	//auto eInd = startInd;
+	//do
+	//{
+	//	auto e = vor.edges[eInd];
+	//	assert(!e.aEmpty || !e.bEmpty);
+	//	if (!e.aEmpty && !e.bEmpty)
+	//	{
+	//		edgeAs.push_back(e.a);
+	//		edgeBs.push_back(e.b);
+	//	}
+	//	else
+	//	{
+	//		const auto m = (points[e.site1].x - points[e.site2].x) / (points[e.site2].y - points[e.site1].y);
+	//		const auto f = -m * (points[e.site1].x + points[e.site2].x) / 2 + (points[e.site1].y + points[e.site2].y) / 2;
+	//		const auto& vertex = vor.vertices[e.a];
+	//		infEdgeAXs.push_back(vertex.p.x);
+	//		infEdgeAYs.push_back(vertex.p.y);
+	//		if (e.isDirLeft)
+	//		{
+	//			infEdgeBXs.push_back(leftBorder);
+	//		}
+	//		else
+	//		{
+	//			infEdgeBXs.push_back(rightBorder);
+	//		}
+	//		infEdgeBYs.push_back(m * infEdgeBXs.back() + f);
+	//	}
+	//	eInd = e.prev;
+	//	if (eInd != -1)
+	//	{
+	//		assert(e.face == vor.edges[eInd].face);
+	//	}
+	//} while (eInd != -1 && eInd != startInd);
 
 	//vector<double> experimentAXs;
 	//vector<double> experimentAYs;
@@ -1208,12 +1268,14 @@ int main()
 	vector<double> delaunayEdgeAYs;
 	vector<double> delaunayEdgeBXs;
 	vector<double> delaunayEdgeBYs;
-	for (const auto& e : vor.delaunayEdges)
+	for (size_t i{ 0 }; i != vor.edges.size(); i += 2)
 	{
-		delaunayEdgeAXs.push_back(points[e.a].x);
-		delaunayEdgeAYs.push_back(points[e.a].y);
-		delaunayEdgeBXs.push_back(points[e.b].x);
-		delaunayEdgeBYs.push_back(points[e.b].y);
+		const auto& e = vor.edges[i];
+		const auto& eTwin = vor.edges[e.twin];
+		delaunayEdgeAXs.push_back(points[e.face].x);
+		delaunayEdgeAYs.push_back(points[e.face].y);
+		delaunayEdgeBXs.push_back(points[eTwin.face].x);
+		delaunayEdgeBYs.push_back(points[eTwin.face].y);
 	}
 
 	vector<double> pointXs;
@@ -1233,23 +1295,26 @@ int main()
 			"edgeAs"_a = edgeAs, "edgeBs"_a = edgeBs,
 			"infEdgeAXs"_a = infEdgeAXs, "infEdgeAYs"_a = infEdgeAYs, "infEdgeBXs"_a = infEdgeBXs, "infEdgeBYs"_a = infEdgeBYs,
 			"delaunayEdgeAXs"_a = delaunayEdgeAXs, "delaunayEdgeAYs"_a = delaunayEdgeAYs, "delaunayEdgeBXs"_a = delaunayEdgeBXs, "delaunayEdgeBYs"_a = delaunayEdgeBYs,
-			"pointXs"_a = pointXs, "pointYs"_a = pointYs };
+			"pointXs"_a = pointXs, "pointYs"_a = pointYs
+		};
+
 		py::exec(R"(
 			import numpy as np
 			import matplotlib.pyplot as plt
+
 			vertexXs = np.array(vertexXs)
 			vertexYs = np.array(vertexYs)
 
-			edges = np.zeros((2, len(edgeAs)), dtype=np.uint64)
-			edges[0,:] = np.array(edgeAs)
-			edges[1,:] = np.array(edgeBs)
+			edges = np.zeros((2, len(edgeAs)), dtype = np.uint64)
+			edges[0, :] = np.array(edgeAs)
+			edges[1, :] = np.array(edgeBs)
 
 			infEdgeXs = np.zeros((2, len(infEdgeAXs)))
-			infEdgeXs[0,:] = np.array(infEdgeAXs)
-			infEdgeXs[1,:] = np.array(infEdgeBXs)
+			infEdgeXs[0, :] = np.array(infEdgeAXs)
+			infEdgeXs[1, :] = np.array(infEdgeBXs)
 			infEdgeYs = np.zeros((2, len(infEdgeAYs)))
-			infEdgeYs[0,:] = np.array(infEdgeAYs)
-			infEdgeYs[1,:] = np.array(infEdgeBYs)
+			infEdgeYs[0, :] = np.array(infEdgeAYs)
+			infEdgeYs[1, :] = np.array(infEdgeBYs)
 
 			delaunayEdgeXs = np.zeros((2, len(delaunayEdgeAXs)))
 			delaunayEdgeXs[0,:] = np.array(delaunayEdgeAXs)
