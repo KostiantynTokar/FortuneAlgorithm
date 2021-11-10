@@ -843,36 +843,25 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 			dcel.edges.push_back(e2);
 
 			const auto intersectionEdgepq = intersection->edgepq = dcel.edges.size() - 2;
-			
-			if (dcel.edges[leftIntersectionEdgepq].face == s1)
-			{
-				dcel.edges[leftIntersectionEdgepq].vertexFrom = dcel.vertices.size() - 1;
-			}
-			else
-			{
-				// TODO: Go to twin.
-				dcel.edges[leftIntersectionEdgepq + 1].vertexFrom = dcel.vertices.size() - 1;
-			}
 
-			if (dcel.edges[rightIntersectionEdgepq].face == bads)
+			const auto setVertexFrom = [&dcel](const ptrdiff_t edgepq, const size_t s)
 			{
-				dcel.edges[rightIntersectionEdgepq].vertexFrom = dcel.vertices.size() - 1;
-			}
-			else
-			{
-				dcel.edges[rightIntersectionEdgepq + 1].vertexFrom = dcel.vertices.size() - 1;
-			}
+				if (dcel.edges[edgepq].face == s)
+				{
+					dcel.edges[edgepq].vertexFrom = dcel.vertices.size() - 1;
+				}
+				else
+				{
+					// TODO: Go to twin.
+					dcel.edges[edgepq + 1].vertexFrom = dcel.vertices.size() - 1;
+				}
+			};
 			
-			if (dcel.edges[intersectionEdgepq].face == s2)
-			{
-				dcel.edges[intersectionEdgepq].vertexFrom = dcel.vertices.size() - 1;
-				dcel.vertices[dcel.vertices.size() - 1].edge = intersectionEdgepq;
-			}
-			else
-			{
-				dcel.edges[intersectionEdgepq + 1].vertexFrom = dcel.vertices.size() - 1;
-				dcel.vertices[dcel.vertices.size() - 1].edge = intersectionEdgepq + 1;
-			}
+			setVertexFrom(leftIntersectionEdgepq, s1);
+			setVertexFrom(rightIntersectionEdgepq, bads);
+			setVertexFrom(intersectionEdgepq, s2);
+			
+			dcel.vertices[dcel.vertices.size() - 1].edge = dcel.edges[intersectionEdgepq].face == s2 ? intersectionEdgepq : intersectionEdgepq + 1;
 
 			// TODO: if this assertion about left orientation of a triangle (s1, bads, s2) is not true,
 			// then put body of setNextAndPrev in if block, copy it to else block with swapping next and prev in lhs.
