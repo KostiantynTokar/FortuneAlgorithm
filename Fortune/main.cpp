@@ -527,6 +527,8 @@ struct Event
 
 struct PriorityQueue
 {
+	// Implemented as binary heap
+	 
 	// Or it can be an array of structs that contain Event and its id.
 	Event* storage;
 	size_t* ids;
