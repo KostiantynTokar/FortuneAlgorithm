@@ -969,9 +969,7 @@ int main()
 	vector<double> infEdgeBYs;
 	for (const auto& e : vor.edges)
 	{
-		//assert(!e.aEmpty || !e.bEmpty);
-		if (e.aEmpty && e.bEmpty)
-			continue;
+		assert(!e.aEmpty || !e.bEmpty);
 		if (!e.aEmpty && !e.bEmpty)
 		{
 			edgeAs.push_back(e.a);
