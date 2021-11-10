@@ -870,23 +870,6 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 				dcel.edges[leftIntersection->edgepq].bEmpty = false;
 			}
 
-			// if (points[s1].x < points[s2].x && points[s1].y < points[s2].y)
-			// {
-			// 	dcel.edges[leftIntersection->edgepq].isDirLeft = true;
-			// }
-			// else if (points[s1].x < points[s2].x && points[s1].y > points[s2].y)
-			// {
-			// 	dcel.edges[leftIntersection->edgepq].isDirLeft = false;
-			// }
-			// else if (points[s1].x > points[s2].x && points[s1].y < points[s2].y)
-			// {
-			// 	dcel.edges[leftIntersection->edgepq].isDirLeft = false;
-			// }
-			// else if (points[s1].x > points[s2].x && points[s1].y > points[s2].y)
-			// {
-			// 	dcel.edges[leftIntersection->edgepq].isDirLeft = true;
-			// }
-
 			s1 = dcel.edges[rightIntersection->edgepq].site1 = arcToRemove->p;
 			s2 = dcel.edges[rightIntersection->edgepq].site2 = right->p;
 			bads = left->p;
@@ -920,24 +903,6 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 				dcel.edges[rightIntersection->edgepq].bEmpty = false;
 			}
 
-
-			// if (points[s1].x < points[s2].x && points[s1].y < points[s2].y)
-			// {
-			// 	dcel.edges[rightIntersection->edgepq].isDirLeft = true;
-			// }
-			// else if (points[s1].x < points[s2].x && points[s1].y > points[s2].y)
-			// {
-			// 	dcel.edges[rightIntersection->edgepq].isDirLeft = false;
-			// }
-			// else if (points[s1].x > points[s2].x && points[s1].y < points[s2].y)
-			// {
-			// 	dcel.edges[rightIntersection->edgepq].isDirLeft = false;
-			// }
-			// else if (points[s1].x > points[s2].x && points[s1].y > points[s2].y)
-			// {
-			// 	dcel.edges[rightIntersection->edgepq].isDirLeft = true;
-			// }
-
 			bads = arcToRemove->p;
 			const auto intersection = beachLine.removeArc(arcToRemove);
 
@@ -959,24 +924,6 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 			middleX = (points[s2].x + points[s1].x)/2;
 			middleY = (points[s2].y + points[s1].y)/2;
 
-			
-
-			// if (points[e.site1].x < points[e.site2].x && points[e.site1].y < points[e.site2].y)
-			// {
-			// 	e.isDirLeft = false;
-			// }
-			// else if (points[e.site1].x < points[e.site2].x && points[e.site1].y > points[e.site2].y)
-			// {
-			// 	e.isDirLeft = true;
-			// }
-			// else if (points[e.site1].x > points[e.site2].x && points[e.site1].y < points[e.site2].y)
-			// {
-			// 	e.isDirLeft = true;
-			// }
-			// else if (points[e.site1].x > points[e.site2].x && points[e.site1].y > points[e.site2].y)
-			// {
-			// 	e.isDirLeft = false;
-			// }
 			dcel.edges.push_back(e);
 			intersection->edgepq = dcel.edges.size() - 1;
 			if ( ((a*(middleX+1)+b*middleY+c))*(dist) > 0 )
@@ -987,6 +934,7 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 			{
 				dcel.edges[intersection->edgepq].isDirLeft = false;
 			}
+			
 			createCircleEvents(ev.y, left, intersection, right, left, intersection, right);
 		}
 		}
