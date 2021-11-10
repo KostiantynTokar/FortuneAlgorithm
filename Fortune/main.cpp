@@ -34,7 +34,7 @@ struct DoublyConnectedEdgeList
 	{
 		size_t a;
 		size_t b;
-		ptrdiff_t vertexFrom; // -1 for edges that starts from infinite.
+		ptrdiff_t vertexFrom = -1; // -1 for edges that starts from infinite.
 		bool aEmpty = true;
 		bool bEmpty = true;
 		
@@ -772,6 +772,8 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 {
 	auto dcel = DoublyConnectedEdgeList{};
 
+	dcel.faces.resize(points.size());
+
 	auto queue = PriorityQueue{ points };
 	auto beachLine = BeachLine{ points };
 
@@ -821,9 +823,25 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 				queue.removeById(intersectedArcEventId);
 			}
 			assert(central->p != left->p);
-			const auto e = DoublyConnectedEdgeList::Edge{ .site1 = central->p, .site2 = left->p };
-			dcel.edges.push_back(e);
-			centralRight->edgepq = leftCentral->edgepq = dcel.edges.size() - 1;
+			const auto e1 = DoublyConnectedEdgeList::Edge{
+				.site1 = central->p, .site2 = left->p,
+				.face = central->p,
+				.twin = dcel.edges.size() + 1
+			};
+			const auto e2 = DoublyConnectedEdgeList::Edge{
+				.site1 = central->p, .site2 = left->p,
+				.face = left->p,
+				.twin = dcel.edges.size()
+			};
+			dcel.edges.push_back(e1);
+			dcel.edges.push_back(e2);
+			dcel.faces[central->p] = DoublyConnectedEdgeList::Face{
+				.edge = dcel.edges.size() - 2
+			};
+			dcel.faces[left->p] = DoublyConnectedEdgeList::Face{
+				.edge = dcel.edges.size() - 1
+			};
+			centralRight->edgepq = leftCentral->edgepq = dcel.edges.size() - 2;
 			createCircleEvents(ev.y, left, leftCentral, central, central, centralRight, right);
 		}
 		break; case Event::Type::circle:
@@ -870,11 +888,15 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 
 			dcel.edges[leftIntersection->edgepq].site1 = left->p;
 			dcel.edges[leftIntersection->edgepq].site2 = arcToRemove->p;
+			dcel.edges[leftIntersection->edgepq + 1].site1 = left->p;
+			dcel.edges[leftIntersection->edgepq + 1].site2 = arcToRemove->p;
 			dcel.edges[leftIntersection->edgepq].isDirLeft = calcIsDirLeft(
 				points[left->p],
 				points[arcToRemove->p],
 				points[right->p]
 			);
+			// NOTE: edgepq + 1 is a twin of edgepq.
+			dcel.edges[leftIntersection->edgepq + 1].isDirLeft = dcel.edges[leftIntersection->edgepq].isDirLeft;
 
 			if (dcel.edges[leftIntersection->edgepq].aEmpty)
 			{
@@ -887,13 +909,28 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 				dcel.edges[leftIntersection->edgepq].bEmpty = false;
 			}
 
+			if (dcel.edges[leftIntersection->edgepq + 1].aEmpty)
+			{
+				dcel.edges[leftIntersection->edgepq + 1].a = dcel.vertices.size() - 1;
+				dcel.edges[leftIntersection->edgepq + 1].aEmpty = false;
+			}
+			else
+			{
+				dcel.edges[leftIntersection->edgepq + 1].b = dcel.vertices.size() - 1;
+				dcel.edges[leftIntersection->edgepq + 1].bEmpty = false;
+			}
+
 			dcel.edges[rightIntersection->edgepq].site1 = arcToRemove->p;
 			dcel.edges[rightIntersection->edgepq].site2 = right->p;
+			dcel.edges[rightIntersection->edgepq + 1].site1 = arcToRemove->p;
+			dcel.edges[rightIntersection->edgepq + 1].site2 = right->p;
 			dcel.edges[rightIntersection->edgepq].isDirLeft = calcIsDirLeft(
 				points[arcToRemove->p],
 				points[right->p],
 				points[left->p]
 			);
+			
+			dcel.edges[rightIntersection->edgepq + 1].isDirLeft = dcel.edges[rightIntersection->edgepq].isDirLeft;
 
 			if (dcel.edges[rightIntersection->edgepq].aEmpty)
 			{
@@ -906,22 +943,87 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 				dcel.edges[rightIntersection->edgepq].bEmpty = false;
 			}
 
+			if (dcel.edges[rightIntersection->edgepq + 1].aEmpty)
+			{
+				dcel.edges[rightIntersection->edgepq + 1].a = dcel.vertices.size() - 1;
+				dcel.edges[rightIntersection->edgepq + 1].aEmpty = false;
+			}
+			else
+			{
+				dcel.edges[rightIntersection->edgepq + 1].b = dcel.vertices.size() - 1;
+				dcel.edges[rightIntersection->edgepq + 1].bEmpty = false;
+			}
+
 			const auto bads = arcToRemove->p;
+			const auto leftIntersectionEdgepq = leftIntersection->edgepq;
+			const auto rightIntersectionEdgepq = rightIntersection->edgepq;
 			const auto intersection = beachLine.removeArc(arcToRemove);
 
-			const auto e = DoublyConnectedEdgeList::Edge{
+			const auto e1 = DoublyConnectedEdgeList::Edge{
 				.a = dcel.vertices.size() - 1, 
 				.aEmpty = false,
-				.site1 = left->p, .site2 = right->p
+				.site1 = left->p, .site2 = right->p,
+				.face = left->p,
+				.twin = dcel.edges.size() + 1
+			};
+			const auto e2 = DoublyConnectedEdgeList::Edge{
+				.a = dcel.vertices.size() - 1, 
+				.aEmpty = false,
+				.site1 = left->p, .site2 = right->p,
+				.face = right->p,
+				.twin = dcel.edges.size()
 			};
 
 			const auto s1 = left->p;
 			const auto s2 = right->p;
 
-			dcel.edges.push_back(e);
-			intersection->edgepq = dcel.edges.size() - 1;
+			dcel.edges.push_back(e1);
+			dcel.edges.push_back(e2);
+
+			const auto intersectionEdgepq = intersection->edgepq = dcel.edges.size() - 2;
 			dcel.edges[intersection->edgepq].isDirLeft = calcIsDirLeft(points[s1], points[s2], points[bads]);
+			dcel.edges[intersection->edgepq + 1].isDirLeft = dcel.edges[intersection->edgepq].isDirLeft;
 			
+			if ( dcel.edges[leftIntersectionEdgepq].face == s1 )
+			{
+				dcel.edges[leftIntersectionEdgepq].vertexFrom = dcel.vertices.size() - 1;
+			}
+			else
+			{
+				// TODO: Go to twin.
+				dcel.edges[leftIntersectionEdgepq + 1].vertexFrom = dcel.vertices.size() - 1;
+			}
+
+			if ( dcel.edges[rightIntersectionEdgepq].face == bads )
+			{
+				dcel.edges[rightIntersectionEdgepq].vertexFrom = dcel.vertices.size() - 1;
+			}
+			else
+			{
+				dcel.edges[rightIntersectionEdgepq + 1].vertexFrom = dcel.vertices.size() - 1;
+			}
+			
+			if ( dcel.edges[intersectionEdgepq].face == s2 )
+			{
+				dcel.edges[intersectionEdgepq].vertexFrom = dcel.vertices.size() - 1;
+				dcel.vertices[dcel.vertices.size() - 1].edge = intersectionEdgepq;
+			}
+			else
+			{
+				dcel.edges[intersectionEdgepq + 1].vertexFrom = dcel.vertices.size() - 1;
+				dcel.vertices[dcel.vertices.size() - 1].edge = intersectionEdgepq + 1;
+			}
+
+			const auto triangle_area = [](const Point& a1, const Point& a2, const Point& a3)
+			{
+				return (a2.x - a1.x) * (a3.y - a1.y) - (a2.y - a1.y) * (a3.x - a1.x);
+			};
+
+			const bool leftOriented = triangle_area( points[s1], points[bads], points[s2]) < 0;
+			assert(leftOriented);
+
+			//if ( dcel.edges[intersection->edgepq].face == s1 )
+
 			createCircleEvents(ev.y, left, intersection, right, left, intersection, right);
 		}
 		}
@@ -955,8 +1057,10 @@ int main()
 	vector<double> infEdgeAYs;
 	vector<double> infEdgeBXs;
 	vector<double> infEdgeBYs;
-	for (const auto& e : vor.edges)
+	// TODO: handle edges withos vertexFrom, use twin.
+	for (size_t i{ 0 }; i < vor.edges.size(); i += 2)
 	{
+		const auto& e = vor.edges[i];
 		assert(!e.aEmpty || !e.bEmpty);
 		if (!e.aEmpty && !e.bEmpty)
 		{
@@ -967,7 +1071,7 @@ int main()
 		{
 			const auto m = (points[e.site1].x - points[e.site2].x) / (points[e.site2].y - points[e.site1].y);
 			const auto f = -m * (points[e.site1].x + points[e.site2].x) / 2 + (points[e.site1].y + points[e.site2].y) / 2;
-			const auto vertex = vor.vertices[e.a];
+			const auto& vertex = vor.vertices[e.a];
 			infEdgeAXs.push_back(vertex.p.x);
 			infEdgeAYs.push_back(vertex.p.y);
 			if (e.isDirLeft)
