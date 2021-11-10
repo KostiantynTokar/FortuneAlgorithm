@@ -188,16 +188,12 @@ struct BeachLine
 		newSubTree->left->edgepq = -1;
 		newSubTree->right = new Node{ .parent = newSubTree, .left = nullptr, .right = nullptr, .p = rightInd, .q = leftInd, .circleEventId = -1, .balance = 0 };
 		const auto redLeaf = newSubTree->right; // Rebalance, then add to this node 2 children.
-		//newSubTree->right->left = new Node{ .parent = newSubTree->right, .left = nullptr, .right = nullptr, .p = site, .q = 0, .circleEventId = -1, .balance = 0 };
-		//newSubTree->right->right = new Node{ .parent = newSubTree->right, .left = nullptr, .right = nullptr, .p = intersectedArc, .q = 0, .circleEventId = -1, .balance = 0 };
 
 		auto res = NewArcInfo{
 			.id = eventId,
 			.left = newSubTree->left,
 			.leftCentralIntersection = newSubTree,
-			//.central = newSubTree->right->left,
 			.centralRightIntersection = newSubTree->right,
-			//.right = newSubTree->right->right
 		};
 		
 		replaceNode(regionNode, newSubTree, regionNodeParent);
@@ -661,33 +657,6 @@ tuple<double, Point> circleBottomPoint(const Point& a, const Point& b, const Poi
 	return make_tuple(yc - r, Point{ xc, yc });
 }
 
-bool isIntersectionBelow(const double y, const Point& a1, const Point& a2, const Point& b1, const Point& b2)
-{
-	// TODO: simplify computations? Direct formula for lines intersection?
-	const auto anotherYA = y + a1.y;
-	const auto anotherYB = y + b1.y;
-
-	const auto lineA1x = parabolasIntersectionX(anotherYA, a1, a2);
-	const auto lineA1y = parabolaY(anotherYA, a1, lineA1x);
-	const auto lineA2x = parabolasIntersectionX(y, a1, a2);
-	const auto lineA2y = parabolaY(y, a1, lineA2x);
-
-	const auto lineB1x = parabolasIntersectionX(anotherYB, b1, b2);
-	const auto lineB1y = parabolaY(anotherYB, b1, lineB1x);
-	const auto lineB2x = parabolasIntersectionX(y, b1, b2);
-	const auto lineB2y = parabolaY(y, b1, lineB2x);
-
-	const auto lineAdx = lineA2x - lineA1x;
-	const auto lineAdy = lineA2y - lineA1y;
-	const auto lineBdx = lineB2x - lineB1x;
-	const auto lineBdy = lineB2y - lineB1y;
-
-	const auto numer = lineBdy * (lineA1y * lineA2x - lineA1x * lineA2y) + lineAdy * (lineB1x * lineB2y - lineB1y * lineB2x);
-	const auto denom = lineAdx * lineBdy - lineBdx * lineAdy;
-
-	return numer / denom <= y;
-}
-
 bool isConvergent(const double y, const Point& a1, const Point& a2, const Point& b1, const Point& b2)
 {
 	const auto leftIntersectionX = parabolasIntersectionX(y, a1, a2);
@@ -713,28 +682,26 @@ bool isConvergent(const double y, const Point& a1, const Point& a2, const Point&
 
 	if (a1.x <= a2.x)
 	{
-		// It is left intersection.
-		// It goes to the left.
+		// It is left intersection, it goes to the left.
 		if (intersectionX > leftIntersectionX)
 			return false;
 	}
 	else
 	{
-		// Intersection goes to the right.
+		// It is right intersection, it goes to the right.
 		if (intersectionX < leftIntersectionX)
 			return false;
 	}
 
 	if (b1.x <= b2.x)
 	{
-		// It is left intersection.
-		// It goes to the left.
+		// It is left intersection, it goes to the left.
 		if (intersectionX > rightIntersectionX)
 			return false;
 	}
 	else
 	{
-		// Intersection goes to the right.
+		// It is right intersection, it goes to the right.
 		if (intersectionX < rightIntersectionX)
 			return false;
 	}
@@ -771,8 +738,6 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 		ptrdiff_t next = -1; // -1 if there is no next (infinite edge).
 		ptrdiff_t prev = -1;
 		size_t twin;
-
-		bool isDirLeft; // from -inf to vertex.
 	};
 
 	auto dcel = DoublyConnectedEdgeList{};
@@ -877,32 +842,10 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 			assert(leftIntersection->edgepq != -1);
 			assert(rightIntersection->edgepq != -1);
 
-			const auto calcIsDirLeft = [](const Point& s1, const Point& s2, const Point& bads)
-			{
-				// ax + by + c = 0
-				const auto a = -(s2.y - s1.y) / (s2.x - s1.x);
-				const auto b = 1.0;
-				const auto c = -(s2.y + a * s2.x);
-
-				const auto dist = (a * bads.x + b * bads.y + c);
-
-				const auto middleX = (s2.x + s1.x) / 2;
-				const auto middleY = (s2.y + s1.y) / 2;
-
-				return (a * (middleX + 1) + b * middleY + c) * dist > 0;
-			};
-
 			tmpEdges[leftIntersection->edgepq].site1 = left->p;
 			tmpEdges[leftIntersection->edgepq].site2 = arcToRemove->p;
 			tmpEdges[leftIntersection->edgepq + 1].site1 = left->p;
 			tmpEdges[leftIntersection->edgepq + 1].site2 = arcToRemove->p;
-			tmpEdges[leftIntersection->edgepq].isDirLeft = calcIsDirLeft(
-				points[left->p],
-				points[arcToRemove->p],
-				points[right->p]
-			);
-			// NOTE: edgepq + 1 is a twin of edgepq.
-			tmpEdges[leftIntersection->edgepq + 1].isDirLeft = tmpEdges[leftIntersection->edgepq].isDirLeft;
 
 			if (tmpEdges[leftIntersection->edgepq].aEmpty)
 			{
@@ -930,13 +873,6 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 			tmpEdges[rightIntersection->edgepq].site2 = right->p;
 			tmpEdges[rightIntersection->edgepq + 1].site1 = arcToRemove->p;
 			tmpEdges[rightIntersection->edgepq + 1].site2 = right->p;
-			tmpEdges[rightIntersection->edgepq].isDirLeft = calcIsDirLeft(
-				points[arcToRemove->p],
-				points[right->p],
-				points[left->p]
-			);
-			
-			tmpEdges[rightIntersection->edgepq + 1].isDirLeft = tmpEdges[rightIntersection->edgepq].isDirLeft;
 
 			if (tmpEdges[rightIntersection->edgepq].aEmpty)
 			{
@@ -987,8 +923,6 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 			tmpEdges.push_back(e2);
 
 			const auto intersectionEdgepq = intersection->edgepq = tmpEdges.size() - 2;
-			tmpEdges[intersection->edgepq].isDirLeft = calcIsDirLeft(points[s1], points[s2], points[bads]);
-			tmpEdges[intersection->edgepq + 1].isDirLeft = tmpEdges[intersection->edgepq].isDirLeft;
 			
 			if (tmpEdges[leftIntersectionEdgepq].face == s1)
 			{
