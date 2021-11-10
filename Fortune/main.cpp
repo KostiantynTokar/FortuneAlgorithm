@@ -939,8 +939,7 @@ int main()
 
 	vector<size_t> edgeAs;
 	vector<size_t> edgeBs;
-	vector<double> infEdgeAXs;
-	vector<double> infEdgeAYs;
+	vector<size_t> infEdgeAs;
 	vector<double> infEdgeBXs;
 	vector<double> infEdgeBYs;
 	for (size_t i{ 0 }; i < vor.edges.size(); i += 2)
@@ -982,9 +981,7 @@ int main()
 			// Ray: y = m * x + f
 			const auto m = (points[s1].x - points[s2].x) / (points[s2].y - points[s1].y);
 			const auto f = -m * (points[s1].x + points[s2].x) / 2 + (points[s1].y + points[s2].y) / 2;
-			const auto& vertex = vor.vertices[e.vertexFrom];
-			infEdgeAXs.push_back(vertex.p.x);
-			infEdgeAYs.push_back(vertex.p.y);
+			infEdgeAs.push_back(e.vertexFrom);
 			infEdgeBXs.push_back(isDirLeft ? drawMinX : drawMaxX);
 			infEdgeBYs.push_back(m * infEdgeBXs.back() + f);
 		}
@@ -1020,7 +1017,7 @@ int main()
 			"drawMinX"_a = drawMinX, "drawMaxX"_a = drawMaxX, "drawMinY"_a = drawMinY, "drawMaxY"_a = drawMaxY,
 			"vertexXs"_a = vertexXs, "vertexYs"_a = vertexYs,
 			"edgeAs"_a = edgeAs, "edgeBs"_a = edgeBs,
-			"infEdgeAXs"_a = infEdgeAXs, "infEdgeAYs"_a = infEdgeAYs, "infEdgeBXs"_a = infEdgeBXs, "infEdgeBYs"_a = infEdgeBYs,
+			"infEdgeAs"_a = infEdgeAs, "infEdgeBXs"_a = infEdgeBXs, "infEdgeBYs"_a = infEdgeBYs,
 			"delaunayEdgeAXs"_a = delaunayEdgeAXs, "delaunayEdgeAYs"_a = delaunayEdgeAYs, "delaunayEdgeBXs"_a = delaunayEdgeBXs, "delaunayEdgeBYs"_a = delaunayEdgeBYs,
 			"pointXs"_a = pointXs, "pointYs"_a = pointYs
 		};
@@ -1036,11 +1033,11 @@ int main()
 			edges[0, :] = np.array(edgeAs)
 			edges[1, :] = np.array(edgeBs)
 
-			infEdgeXs = np.zeros((2, len(infEdgeAXs)))
-			infEdgeXs[0, :] = np.array(infEdgeAXs)
+			infEdgeXs = np.zeros((2, len(infEdgeAs)))
+			infEdgeXs[0, :] = vertexXs[infEdgeAs]
 			infEdgeXs[1, :] = np.array(infEdgeBXs)
-			infEdgeYs = np.zeros((2, len(infEdgeAYs)))
-			infEdgeYs[0, :] = np.array(infEdgeAYs)
+			infEdgeYs = np.zeros((2, len(infEdgeAs)))
+			infEdgeYs[0, :] = vertexYs[infEdgeAs]
 			infEdgeYs[1, :] = np.array(infEdgeBYs)
 
 			delaunayEdgeXs = np.zeros((2, len(delaunayEdgeAXs)))
