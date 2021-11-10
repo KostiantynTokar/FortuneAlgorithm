@@ -33,9 +33,8 @@ struct DoublyConnectedEdgeList
 	};
 	struct DelaunayEdge
 	{
-		// TODO: change to indices to input sites.
-		Point a;
-		Point b;
+		size_t a;
+		size_t b;
 	};
 	vector<Edge> edges; // up to n^2 elements?
 	vector<Point> vertices;
@@ -942,7 +941,7 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 
 	for (const auto& e : dcel.edges)
 	{
-		dcel.delaunayEdges.push_back({ points[e.site1], points[e.site2] });
+		dcel.delaunayEdges.push_back({ e.site1, e.site2 });
 	}
 
 	return dcel;
@@ -1003,10 +1002,10 @@ int main()
 	vector<double> delaunayEdgeBYs;
 	for (const auto& e : vor.delaunayEdges)
 	{
-		delaunayEdgeAXs.push_back(e.a.x);
-		delaunayEdgeAYs.push_back(e.a.y);
-		delaunayEdgeBXs.push_back(e.b.x);
-		delaunayEdgeBYs.push_back(e.b.y);
+		delaunayEdgeAXs.push_back(points[e.a].x);
+		delaunayEdgeAYs.push_back(points[e.a].y);
+		delaunayEdgeBXs.push_back(points[e.b].x);
+		delaunayEdgeBYs.push_back(points[e.b].y);
 	}
 
 	vector<double> pointXs;
