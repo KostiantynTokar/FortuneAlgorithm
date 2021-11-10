@@ -21,14 +21,31 @@ struct Point
 
 struct DoublyConnectedEdgeList
 {
+	struct Vertex
+	{
+		Point p;
+		size_t edge;
+	};
+	struct Face
+	{
+		size_t edge;
+	};
 	struct Edge
 	{
 		size_t a;
 		size_t b;
+		ptrdiff_t vertexFrom; // -1 for edges that starts from infinite.
 		bool aEmpty = true;
 		bool bEmpty = true;
+		
 		size_t site1;
 		size_t site2;
+		size_t face;
+
+		size_t next;
+		size_t prev;
+		size_t twin;
+
 		bool isDirLeft; // from -inf to vertex.
 	};
 	struct DelaunayEdge
@@ -37,7 +54,8 @@ struct DoublyConnectedEdgeList
 		size_t b;
 	};
 	vector<Edge> edges; // up to n^2 elements?
-	vector<Point> vertices;
+	vector<Vertex> vertices;
+	vector<Face> faces;
 	vector<DelaunayEdge> delaunayEdges;
 };
 
@@ -810,7 +828,7 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 		}
 		break; case Event::Type::circle:
 		{
-			dcel.vertices.push_back(ev.center);
+			dcel.vertices.push_back({ ev.center, 0 }); // TODO: 0
 			const auto arcToRemove = ev.leaf;
 			const auto left = beachLine.findLeafToLeft(arcToRemove);
 			const auto right = beachLine.findLeafToRight(arcToRemove);
@@ -957,8 +975,8 @@ int main()
 	vector<double> vertexYs;
 	for(const auto& p : vor.vertices)
 	{
-		vertexXs.push_back(p.x);
-		vertexYs.push_back(p.y);
+		vertexXs.push_back(p.p.x);
+		vertexYs.push_back(p.p.y);
 	}
 
 	vector<size_t> edgeAs;
@@ -980,8 +998,8 @@ int main()
 			const auto m = (points[e.site1].x - points[e.site2].x) / (points[e.site2].y - points[e.site1].y);
 			const auto f = -m * (points[e.site1].x + points[e.site2].x) / 2 + (points[e.site1].y + points[e.site2].y) / 2;
 			const auto vertex = vor.vertices[e.a];
-			infEdgeAXs.push_back(vertex.x);
-			infEdgeAYs.push_back(vertex.y);
+			infEdgeAXs.push_back(vertex.p.x);
+			infEdgeAYs.push_back(vertex.p.y);
 			if (e.isDirLeft)
 			{
 				infEdgeBXs.push_back(leftBorder);
