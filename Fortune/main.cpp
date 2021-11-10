@@ -1,5 +1,6 @@
 #include <vector>
 #include <algorithm>
+#include <numeric>
 #include <tuple>
 #include <limits>
 #include <cassert>
@@ -911,8 +912,23 @@ int main()
 {
 	const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6} };
 	const auto vor = fortune(points);
-	const auto leftBorder = -20;
-	const auto rightBorder = 20;
+	const auto [minX, maxX, minY, maxY] = reduce(
+		cbegin(points), cend(points),
+		make_tuple(numeric_limits<double>::max(), numeric_limits<double>::min(), numeric_limits<double>::max(), numeric_limits<double>::min()),
+		[](const auto& accum, const Point& p)
+		{
+			return make_tuple(min(get<0>(accum), p.x), max(get<1>(accum), p.x), min(get<2>(accum), p.y), max(get<3>(accum), p.y));
+		}
+		);
+	constexpr auto regionSizeMultiplier = 1.61803398875;
+	const auto regionCenterX = (minX + maxX) / 2;
+	const auto regionCenterY = (minY + maxY) / 2;
+	const auto regionHalfSize = regionSizeMultiplier * max(maxX - minX, maxY - minY) / 2;
+	const auto drawMinX = regionCenterX - regionHalfSize;
+	const auto drawMaxX = regionCenterX + regionHalfSize;
+	const auto drawMinY = regionCenterY - regionHalfSize;
+	const auto drawMaxY = regionCenterY + regionHalfSize;
+
 	vector<double> vertexXs;
 	vector<double> vertexYs;
 	for(const auto& p : vor.vertices)
@@ -969,14 +985,7 @@ int main()
 			const auto& vertex = vor.vertices[e.vertexFrom];
 			infEdgeAXs.push_back(vertex.p.x);
 			infEdgeAYs.push_back(vertex.p.y);
-			if (isDirLeft)
-			{
-				infEdgeBXs.push_back(leftBorder);
-			}
-			else
-			{
-				infEdgeBXs.push_back(rightBorder);
-			}
+			infEdgeBXs.push_back(isDirLeft ? drawMinX : drawMaxX);
 			infEdgeBYs.push_back(m * infEdgeBXs.back() + f);
 		}
 	}
@@ -1008,6 +1017,7 @@ int main()
 		py::scoped_interpreter interpreter_guard{};
 
 		py::dict locals{
+			"drawMinX"_a = drawMinX, "drawMaxX"_a = drawMaxX, "drawMinY"_a = drawMinY, "drawMaxY"_a = drawMaxY,
 			"vertexXs"_a = vertexXs, "vertexYs"_a = vertexYs,
 			"edgeAs"_a = edgeAs, "edgeBs"_a = edgeBs,
 			"infEdgeAXs"_a = infEdgeAXs, "infEdgeAYs"_a = infEdgeAYs, "infEdgeBXs"_a = infEdgeBXs, "infEdgeBYs"_a = infEdgeBYs,
@@ -1051,8 +1061,8 @@ int main()
 			ax.plot(delaunayEdgeXs, delaunayEdgeYs, 'r-')
 			ax.scatter(pointXs, pointYs, c = 'r')
 			ax.set_aspect(1)
-			plt.xlim([-15,15])
-			plt.ylim([-15,15])
+			plt.xlim([drawMinX, drawMaxX])
+			plt.ylim([drawMinY, drawMaxY])
 			plt.show()
 			)",
 			py::globals(), locals);
