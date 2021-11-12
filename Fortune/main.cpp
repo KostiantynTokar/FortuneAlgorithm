@@ -904,17 +904,18 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 
 int main()
 {
-	//const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6} };
-	const auto points = vector<Point>{ {0, 10} };
+	const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6} };
 	const auto vor = fortune(points);
-	const auto [minX, maxX, minY, maxY] = reduce(
-		cbegin(points), cend(points),
-		make_tuple(numeric_limits<double>::max(), numeric_limits<double>::min(), numeric_limits<double>::max(), numeric_limits<double>::min()),
-		[](const auto& accum, const Point& p)
-		{
-			return make_tuple(min(get<0>(accum), p.x), max(get<1>(accum), p.x), min(get<2>(accum), p.y), max(get<3>(accum), p.y));
-		}
-		);
+	const auto [minX, maxX, minY, maxY] = points.size() == 0
+		? make_tuple(0.0, 0.0, 0.0, 0.0)
+		: reduce(
+			cbegin(points), cend(points),
+			make_tuple(numeric_limits<double>::max(), numeric_limits<double>::min(), numeric_limits<double>::max(), numeric_limits<double>::min()),
+			[](const auto& accum, const Point& p)
+			{
+				return make_tuple(min(get<0>(accum), p.x), max(get<1>(accum), p.x), min(get<2>(accum), p.y), max(get<3>(accum), p.y));
+			}
+			);
 	constexpr auto regionSizeMultiplier = 1.61803398875;
 	const auto regionCenterX = (minX + maxX) / 2;
 	const auto regionCenterY = (minY + maxY) / 2;
