@@ -85,22 +85,16 @@ double parabolasIntersectionX(const double sweepLineY, const Point& site1, const
 {
 	const auto sx1 = site1.x;
 	const auto sx2 = site2.x;
-	const auto sy1 = site1.y;
-	const auto sy2 = site2.y;
 	const auto p1 = site1.y - sweepLineY;
 	const auto p2 = site2.y - sweepLineY;
 
-	const auto syDiff = sy2 - sy1;
-	//const auto D = sqrt(p1 * p2) * hypot(sx1 - sx2, sy1 - sy2);
 	const auto mb = sx1 * p2 - sx2 * p1;
 
-	const auto syDiffSign = syDiff >= 0 ? 1.0 : -1.0;
-	//return syDiffSign * sx1 <= syDiffSign * sx2 ? (mb - D) / syDiff : (mb + D) / syDiff;
-
 	const auto pDiff = p2 - p1;
+	const auto pDiffSign = pDiff >= 0 ? 1.0 : -1.0;
 	const auto sxDiff = sx2 - sx1;
 	const auto D = sqrt(p1 * p2 * (sxDiff * sxDiff + pDiff * pDiff));
-	return syDiffSign * sx1 <= syDiffSign * sx2 ? (mb - D) / pDiff : (mb + D) / pDiff;
+	return pDiffSign * sx1 <= pDiffSign * sx2 ? (mb - D) / pDiff : (mb + D) / pDiff;
 }
 
 double parabolaY(const double sweepLineY, const Point& site, const double x)
