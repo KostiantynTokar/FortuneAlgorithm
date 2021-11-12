@@ -876,7 +876,8 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 
 int main()
 {
-	const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6} };
+	//const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6} };
+	const auto points = vector<Point>{ {0, 10}, {1, 9} };
 	const auto vor = fortune(points);
 	const auto [minX, maxX, minY, maxY] = reduce(
 		cbegin(points), cend(points),
@@ -908,6 +909,10 @@ int main()
 	vector<size_t> infEdgeAs;
 	vector<double> infEdgeBXs;
 	vector<double> infEdgeBYs;
+	vector<double> doubleInfEdgeAXs;
+	vector<double> doubleInfEdgeAYs;
+	vector<double> doubleInfEdgeBXs;
+	vector<double> doubleInfEdgeBYs;
 	for (size_t i{ 0 }; i < vor.edges.size(); i += 2)
 	{
 		const auto& e1 = vor.edges[i];
@@ -917,9 +922,8 @@ int main()
 			edgeAs.push_back(e1.vertexFrom);
 			edgeBs.push_back(e2.vertexFrom);
 		}
-		else
+		else if (e1.vertexFrom != -1 || e2.vertexFrom != -1)
 		{
-			assert(e1.vertexFrom != -1 || e2.vertexFrom != -1);
 			const auto& [e, eTwinInd] = e1.vertexFrom == -1 ? make_tuple(e2, i) : make_tuple(e1, i + 1);
 			// s1, s2 - sLeft, sRight.
 			const auto s1 = e.face;
@@ -952,7 +956,21 @@ int main()
 			infEdgeBXs.push_back(isDirLeft ? drawMinX : drawMaxX);
 			infEdgeBYs.push_back(m * infEdgeBXs.back() + f);
 		}
+		else
+		{
+			assert(points.size() == 2);
+			const auto s1 = e1.face;
+			const auto s2 = e2.face;
+			assert(s1 != s2);
+			const auto m = (points[s1].x - points[s2].x) / (points[s2].y - points[s1].y);
+			const auto f = -m * (points[s1].x + points[s2].x) / 2 + (points[s1].y + points[s2].y) / 2;
+			doubleInfEdgeAXs.push_back(drawMinX);
+			doubleInfEdgeAYs.push_back(m * drawMinX + f);
+			doubleInfEdgeBXs.push_back(drawMaxX);
+			doubleInfEdgeBYs.push_back(m * drawMaxX + f);
+		}
 	}
+	assert(doubleInfEdgeAXs.size() <= 1);
 
 	vector<size_t> delaunayEdgeAs;
 	vector<size_t> delaunayEdgeBs;
@@ -980,6 +998,7 @@ int main()
 			"vertexXs"_a = vertexXs, "vertexYs"_a = vertexYs,
 			"edgeAs"_a = edgeAs, "edgeBs"_a = edgeBs,
 			"infEdgeAs"_a = infEdgeAs, "infEdgeBXs"_a = infEdgeBXs, "infEdgeBYs"_a = infEdgeBYs,
+			"doubleInfEdgeAXs"_a = doubleInfEdgeAXs, "doubleInfEdgeAYs"_a = doubleInfEdgeAYs, "doubleInfEdgeBXs"_a = doubleInfEdgeBXs, "doubleInfEdgeBYs"_a = doubleInfEdgeBYs,
 			"delaunayEdgeAs"_a = delaunayEdgeAs, "delaunayEdgeBs"_a = delaunayEdgeBs,
 			"pointXs"_a = pointXs, "pointYs"_a = pointYs
 		};
@@ -1002,6 +1021,13 @@ int main()
 			infEdgeYs[0, :] = vertexYs[infEdgeAs]
 			infEdgeYs[1, :] = np.array(infEdgeBYs)
 
+			doubleInfEdgeXs = np.zeros((2, len(doubleInfEdgeAXs)))
+			doubleInfEdgeXs[0, :] = np.array(doubleInfEdgeAXs)
+			doubleInfEdgeXs[1, :] = np.array(doubleInfEdgeBXs)
+			doubleInfEdgeYs = np.zeros((2, len(doubleInfEdgeAYs)))
+			doubleInfEdgeYs[0, :] = np.array(doubleInfEdgeAYs)
+			doubleInfEdgeYs[1, :] = np.array(doubleInfEdgeBYs)
+
 			delaunayEdges = np.zeros((2, len(delaunayEdgeAs)), dtype = np.uint64)
 			delaunayEdges[0, :] = np.array(delaunayEdgeAs)
 			delaunayEdges[1, :] = np.array(delaunayEdgeBs)
@@ -1014,6 +1040,7 @@ int main()
 			ax.scatter(vertexXs, vertexYs, c = 'b')
 			ax.plot(vertexXs[edges], vertexYs[edges], 'y-')
 			ax.plot(infEdgeXs, infEdgeYs, 'y-')
+			ax.plot(doubleInfEdgeXs, doubleInfEdgeYs)
 			ax.plot(pointXs[delaunayEdges], pointYs[delaunayEdges], 'r-')
 			ax.scatter(pointXs, pointYs, c = 'r')
 			ax.set_aspect(1)
