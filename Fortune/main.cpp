@@ -14,6 +14,34 @@ using namespace std;
 namespace py = pybind11;
 using namespace py::literals;
 
+bool approximatelyEqual(double a, double b, double epsilon = numeric_limits<double>::epsilon())
+{
+	return abs(a - b) <= ((abs(a) < abs(b) ? abs(b) : abs(a)) * epsilon);
+}
+
+bool essentiallyEqual(double a, double b, double epsilon = numeric_limits<double>::epsilon())
+{
+	return abs(a - b) <= ((abs(a) > abs(b) ? abs(b) : abs(a)) * epsilon);
+}
+
+bool definitelyGreaterThan(double a, double b, double epsilon = numeric_limits<double>::epsilon())
+{
+	return (a - b) > ((abs(a) < abs(b) ? abs(b) : abs(a)) * epsilon);
+}
+
+bool definitelyLessThan(double a, double b, double epsilon = numeric_limits<double>::epsilon())
+{
+	return (b - a) > ((abs(a) < abs(b) ? abs(b) : abs(a)) * epsilon);
+}
+
+bool isClose(double a, double b, double maxRelDiff = 1e-9, double maxAbsDiff = 0.0)
+{
+	const auto diff = abs(a - b);
+	return diff <= maxRelDiff * abs(a)
+		|| diff <= maxRelDiff * abs(b)
+		|| diff <= maxAbsDiff;
+}
+
 struct Point
 {
 	double x;
@@ -877,7 +905,7 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 int main()
 {
 	//const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6} };
-	const auto points = vector<Point>{ {0, 10}, {1, 9} };
+	const auto points = vector<Point>{ {0, 10} };
 	const auto vor = fortune(points);
 	const auto [minX, maxX, minY, maxY] = reduce(
 		cbegin(points), cend(points),
@@ -890,7 +918,8 @@ int main()
 	constexpr auto regionSizeMultiplier = 1.61803398875;
 	const auto regionCenterX = (minX + maxX) / 2;
 	const auto regionCenterY = (minY + maxY) / 2;
-	const auto regionHalfSize = regionSizeMultiplier * max(maxX - minX, maxY - minY) / 2;
+	const auto regionHalfSizeExact = regionSizeMultiplier * max(maxX - minX, maxY - minY) / 2;
+	const auto regionHalfSize = isClose(regionHalfSizeExact, 0.0, 0.0, 1e-50) ? 0.5 : regionHalfSizeExact;
 	const auto drawMinX = regionCenterX - regionHalfSize;
 	const auto drawMaxX = regionCenterX + regionHalfSize;
 	const auto drawMinY = regionCenterY - regionHalfSize;
