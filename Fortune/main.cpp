@@ -34,12 +34,17 @@ bool definitelyLessThan(double a, double b, double epsilon = numeric_limits<doub
 	return (b - a) > ((abs(a) < abs(b) ? abs(b) : abs(a)) * epsilon);
 }
 
-bool isClose(double a, double b, double maxRelDiff = 1e-9, double maxAbsDiff = 0.0)
+bool isClose(double a, double b, double maxRelDiff = 1e-9, double maxAbsDiff = 1e-50)
 {
 	const auto diff = abs(a - b);
 	return diff <= maxRelDiff * abs(a)
 		|| diff <= maxRelDiff * abs(b)
 		|| diff <= maxAbsDiff;
+}
+
+bool isCloseToZero(double a, double maxAbsDiff = 1e-50)
+{
+	return isClose(a, 0.0, 0.0, maxAbsDiff);
 }
 
 struct Point
@@ -98,9 +103,10 @@ double parabolasIntersectionX(const double sweepLineY, const Point& site1, const
 	return syDiffSign * sx1 <= syDiffSign * sx2 ? (mb - D) / pDiff : (mb + D) / pDiff;
 }
 
-constexpr double parabolaY(const double sweepLineY, const Point& site, const double x)
+double parabolaY(const double sweepLineY, const Point& site, const double x)
 {
 	const auto p = site.y - sweepLineY;
+	assert(!isCloseToZero(p));
 	return x * x / (2 * p) - (site.x * x) / p + (site.x * site.x) / (2 * p) + p / 2 + sweepLineY;
 }
 
@@ -200,7 +206,7 @@ struct BeachLine
 
 		size_t leftInd;
 		size_t rightInd;
-		if (points[intersectedArc].x < points[site].x)
+		if (points[intersectedArc].x <= points[site].x)
 		{
 			leftInd = intersectedArc;
 			rightInd = site;
@@ -683,10 +689,22 @@ struct PriorityQueue
 // Returns y-coordinate of the bottom point and the center of the circle.
 tuple<double, Point> circleBottomPoint(const Point& a, const Point& b, const Point& c)
 {
-	const auto ma = (b.y - a.y) / (b.x - a.x);
-	const auto mb = (c.y - b.y) / (c.x - b.x);
-	const auto xc = (ma * mb * (a.y - c.y) + mb * (a.x + b.x) - ma * (b.x + c.x)) / (2 * (mb - ma));
-	const auto yc = ((a.x + b.x) / 2 - xc) / ma + (a.y + b.y) / 2;
+	// Intersection of perpendiculars that pass through the center of a circle of lines
+	// (b.x - a.x) * y - (b.y - a.y) * x + a.y * (b.x - a.x) - a.x = 0
+	// (c.x - b.x) * y - (c.y - b.y) * x + b.y * (c.x - b.x) - b.x = 0
+	const auto y21 = b.y - a.y;
+	const auto y32 = c.y - b.y;
+	const auto y31 = c.y - a.y;
+	const auto y12s = a.y + b.y;
+	const auto y23s = b.y + c.y;
+	const auto x21 = b.x - a.x;
+	const auto x32 = c.x - b.x;
+	const auto x31 = c.x - a.x;
+	const auto x12s = a.x + b.x;
+	const auto x23s = b.x + c.x;
+	const auto denom = 2 * (y32 * x21 - y21 * x32);
+	const auto xc = -(y21 * y32 * y31 - y32 * x21 * x12s + y21 * x32 * x23s) / denom;
+	const auto yc =  (x21 * x32 * x31 - x32 * y21 * y12s + x21 * y32 * y23s) / denom;
 	const auto r = hypot(a.x - xc, a.y - yc);
 	return make_tuple(yc - r, Point{ xc, yc });
 }
@@ -694,10 +712,10 @@ tuple<double, Point> circleBottomPoint(const Point& a, const Point& b, const Poi
 bool isConvergent(const double y, const Point& a1, const Point& a2, const Point& b1, const Point& b2)
 {
 	const auto leftIntersectionX = parabolasIntersectionX(y, a1, a2);
-	const auto leftIntersectionY = parabolaY(y, a1, leftIntersectionX);
+	const auto leftIntersectionY = parabolaY(y, a1.y > a2.y ? a1 : a2, leftIntersectionX);
 
 	const auto rightIntersectionX = parabolasIntersectionX(y, b1, b2);
-	const auto rightIntersectionY = parabolaY(y, b1, rightIntersectionX);
+	const auto rightIntersectionY = parabolaY(y, b1.y > b2.y ? b1 : b2, rightIntersectionX);
 
 	// y = m * x + f
 	const auto m1 = (a1.x - a2.x) / (a2.y - a1.y);
@@ -706,38 +724,43 @@ bool isConvergent(const double y, const Point& a1, const Point& a2, const Point&
 	const auto m2 = (b1.x - b2.x) / (b2.y - b1.y);
 	const auto f2 = -m2 * (b1.x + b2.x) / 2 + (b1.y + b2.y) / 2;
 
-	// TODO: isClose
-	if (m1 == m2)
+	if (isClose(m1, m2))
 	{
 		return false;
 	}
 	const auto intersectionX = (f2 - f1) / (m1 - m2);
 	const auto intersectionY = m1 * intersectionX + f1;
 
-	if (a1.x <= a2.x)
+	if (!isClose(a1.x, a2.x))
 	{
-		// It is left intersection, it goes to the left.
-		if (intersectionX > leftIntersectionX)
-			return false;
-	}
-	else
-	{
-		// It is right intersection, it goes to the right.
-		if (intersectionX < leftIntersectionX)
-			return false;
+		if (a1.x < a2.x)
+		{
+			// It is left intersection, it goes to the left.
+			if (intersectionX > leftIntersectionX)
+				return false;
+		}
+		else
+		{
+			// It is right intersection, it goes to the right.
+			if (intersectionX < leftIntersectionX)
+				return false;
+		}
 	}
 
-	if (b1.x <= b2.x)
+	if (!isClose(b1.x, b2.x))
 	{
-		// It is left intersection, it goes to the left.
-		if (intersectionX > rightIntersectionX)
-			return false;
-	}
-	else
-	{
-		// It is right intersection, it goes to the right.
-		if (intersectionX < rightIntersectionX)
-			return false;
+		if (b1.x <= b2.x)
+		{
+			// It is left intersection, it goes to the left.
+			if (intersectionX > rightIntersectionX)
+				return false;
+		}
+		else
+		{
+			// It is right intersection, it goes to the right.
+			if (intersectionX < rightIntersectionX)
+				return false;
+		}
 	}
 
 	const auto site1 = a1;
@@ -890,9 +913,9 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 				}
 			};
 
-			setNextAndPrev( intersectionEdgepq, leftIntersectionEdgepq, rightIntersectionEdgepq, s1, s2 );
-			setNextAndPrev( leftIntersectionEdgepq, rightIntersectionEdgepq, intersectionEdgepq, bads, s1 );
-			setNextAndPrev( rightIntersectionEdgepq, intersectionEdgepq, leftIntersectionEdgepq, s2, bads );
+			setNextAndPrev(intersectionEdgepq, leftIntersectionEdgepq, rightIntersectionEdgepq, s1, s2);
+			setNextAndPrev(leftIntersectionEdgepq, rightIntersectionEdgepq, intersectionEdgepq, bads, s1);
+			setNextAndPrev(rightIntersectionEdgepq, intersectionEdgepq, leftIntersectionEdgepq, s2, bads);
 
 			createCircleEvents(ev.y, left, intersection, right, left, intersection, right);
 		}
@@ -905,6 +928,7 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 int main()
 {
 	const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6} };
+	//const auto points = vector<Point>{ {1, 2}, {0, 1}, {0, 0} };
 	const auto vor = fortune(points);
 	const auto [minX, maxX, minY, maxY] = points.size() == 0
 		? make_tuple(0.0, 0.0, 0.0, 0.0)
@@ -920,7 +944,7 @@ int main()
 	const auto regionCenterX = (minX + maxX) / 2;
 	const auto regionCenterY = (minY + maxY) / 2;
 	const auto regionHalfSizeExact = regionSizeMultiplier * max(maxX - minX, maxY - minY) / 2;
-	const auto regionHalfSize = isClose(regionHalfSizeExact, 0.0, 0.0, 1e-50) ? 0.5 : regionHalfSizeExact;
+	const auto regionHalfSize = isCloseToZero(regionHalfSizeExact) ? 0.5 : regionHalfSizeExact;
 	const auto drawMinX = regionCenterX - regionHalfSize;
 	const auto drawMaxX = regionCenterX + regionHalfSize;
 	const auto drawMinY = regionCenterY - regionHalfSize;
