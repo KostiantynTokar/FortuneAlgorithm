@@ -94,6 +94,10 @@ double parabolasIntersectionX(const double sweepLineY, const Point& site1, const
 	const auto pDiffSign = pDiff >= 0 ? 1.0 : -1.0;
 	const auto sxDiff = sx2 - sx1;
 	const auto D = sqrt(p1 * p2 * (sxDiff * sxDiff + pDiff * pDiff));
+	if (isClose(sx1, sx2))
+	{
+		return pDiffSign * site1.y > pDiffSign * site2.y ? (mb - D) / pDiff : (mb + D) / pDiff;
+	}
 	return pDiffSign * sx1 <= pDiffSign * sx2 ? (mb - D) / pDiff : (mb + D) / pDiff;
 }
 
@@ -200,7 +204,7 @@ struct BeachLine
 
 		size_t leftInd;
 		size_t rightInd;
-		if (points[intersectedArc].x <= points[site].x)
+		if (isClose(points[intersectedArc].x, points[site].x) || points[intersectedArc].x < points[site].x)
 		{
 			leftInd = intersectedArc;
 			rightInd = site;
@@ -229,17 +233,19 @@ struct BeachLine
 		replaceNode(regionNode, newSubTree, regionNodeParent);
 
 		auto child = newSubTree;
-		bool needRebalance = true;
-		while (regionNodeParent != nullptr && (needRebalance || child->balance != 0))
+		if (regionNodeParent != nullptr)
 		{
-			if (regionNodeParent->left == child)
-				--regionNodeParent->balance;
-			else
-				++regionNodeParent->balance;
-			assert(-2 <= regionNodeParent->balance && regionNodeParent->balance <= 2);
-			child = regionNodeParent;
-			regionNodeParent = regionNodeParent->parent;
-			needRebalance = rebalanceSubTree(child, regionNodeParent);
+			do
+			{
+				if (regionNodeParent->left == child)
+					--regionNodeParent->balance;
+				else
+					++regionNodeParent->balance;
+				assert(-2 <= regionNodeParent->balance && regionNodeParent->balance <= 2);
+				child = regionNodeParent;
+				regionNodeParent = regionNodeParent->parent;
+				rebalanceSubTree(child, regionNodeParent);
+			} while (regionNodeParent != nullptr && child->balance != 0);
 		}
 
 		redLeaf->left = new Node{ .parent = redLeaf, .left = nullptr, .right = nullptr, .p = site, .q = 0, .circleEventId = -1, .balance = 0 };
@@ -250,17 +256,19 @@ struct BeachLine
 
 		child = redLeaf;
 		regionNodeParent = child->parent;
-		needRebalance = true;
-		while (regionNodeParent != nullptr && (needRebalance || child->balance != 0))
+		if (regionNodeParent != nullptr)
 		{
-			if (regionNodeParent->left == child)
-				--regionNodeParent->balance;
-			else
-				++regionNodeParent->balance;
-			assert(-2 <= regionNodeParent->balance && regionNodeParent->balance <= 2);
-			child = regionNodeParent;
-			regionNodeParent = regionNodeParent->parent;
-			needRebalance = rebalanceSubTree(child, regionNodeParent);
+			do
+			{
+				if (regionNodeParent->left == child)
+					--regionNodeParent->balance;
+				else
+					++regionNodeParent->balance;
+				assert(-2 <= regionNodeParent->balance && regionNodeParent->balance <= 2);
+				child = regionNodeParent;
+				regionNodeParent = regionNodeParent->parent;
+				rebalanceSubTree(child, regionNodeParent);
+			} while (regionNodeParent != nullptr && child->balance != 0);
 		}
 
 		return res;
@@ -317,9 +325,9 @@ struct BeachLine
 		delete node;
 
 		auto parent = aboveLower->parent;
-		auto needRebalance = rebalanceSubTree(aboveLower, parent);
+		rebalanceSubTree(aboveLower, parent);
 
-		while (parent != nullptr && (needRebalance || aboveLower->balance == 0))
+		while (parent != nullptr && aboveLower->balance == 0)
 		{
 			// Height of subtree rooted at aboveLower is decreased.
 			if (parent->left == aboveLower)
@@ -328,7 +336,7 @@ struct BeachLine
 				--parent->balance;
 			aboveLower = parent;
 			parent = parent->parent;
-			needRebalance = rebalanceSubTree(aboveLower, parent);
+			rebalanceSubTree(aboveLower, parent);
 		}
 
 		return higherNode;
@@ -405,7 +413,7 @@ struct BeachLine
 		return root == nullptr;
 	}
 
-	constexpr bool rebalanceSubTree(Node*& node, Node* parent)
+	constexpr void rebalanceSubTree(Node*& node, Node* parent)
 	{
 		if (node->balance == 2)
 		{
@@ -450,7 +458,6 @@ struct BeachLine
 
 				node = grandchild;
 			}
-			return true;
 		}
 		else if (node->balance == -2)
 		{
@@ -495,9 +502,7 @@ struct BeachLine
 
 				node = grandchild;
 			}
-			return true;
 		}
-		return false;
 	}
 
 	constexpr void trustedReplaceNode(Node* oldNode, Node* newNode, Node* parent)
@@ -740,6 +745,19 @@ bool isConvergent(const double y, const Point& a1, const Point& a2, const Point&
 				return false;
 		}
 	}
+	else
+	{
+		if (a1.y > a2.y)
+		{
+			if (intersectionX > leftIntersectionX)
+				return false;
+		}
+		else
+		{
+			if (intersectionX < leftIntersectionX)
+				return false;
+		}
+	}
 
 	if (!isClose(b1.x, b2.x))
 	{
@@ -752,6 +770,19 @@ bool isConvergent(const double y, const Point& a1, const Point& a2, const Point&
 		else
 		{
 			// It is right intersection, it goes to the right.
+			if (intersectionX < rightIntersectionX)
+				return false;
+		}
+	}
+	else
+	{
+		if (b1.y > b2.y)
+		{
+			if (intersectionX > rightIntersectionX)
+				return false;
+		}
+		else
+		{
 			if (intersectionX < rightIntersectionX)
 				return false;
 		}
@@ -921,19 +952,27 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 
 int main()
 {
-	const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6} };
-	//const auto points = vector<Point>{ {1, 2}, {0, 1}, {0, 0} };
+	//const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6}, {-11, 11}/*, {-11, 7.5}*/ };
+	const auto points = vector<Point>{ {-1, 2}, {0, 1}, {0, 0}, {0, -1}, {0, -2} };
+	//const auto points = vector<Point>{ {4, 0}, {0, 8}, {8, 2}, {7, 9} };
 	const auto vor = fortune(points);
-	const auto [minX, maxX, minY, maxY] = points.size() == 0
+	const auto minMaxXY = [](const tuple<double, double, double, double>& accum, const Point& p)
+	{
+		return make_tuple(min(get<0>(accum), p.x), max(get<1>(accum), p.x), min(get<2>(accum), p.y), max(get<3>(accum), p.y));
+	};
+	const auto pointsMinMax = points.size() == 0
 		? make_tuple(0.0, 0.0, 0.0, 0.0)
 		: reduce(
 			cbegin(points), cend(points),
 			make_tuple(numeric_limits<double>::max(), numeric_limits<double>::min(), numeric_limits<double>::max(), numeric_limits<double>::min()),
-			[](const auto& accum, const Point& p)
-			{
-				return make_tuple(min(get<0>(accum), p.x), max(get<1>(accum), p.x), min(get<2>(accum), p.y), max(get<3>(accum), p.y));
-			}
-			);
+			minMaxXY
+		);
+	const auto [minX, maxX, minY, maxY] = transform_reduce(
+		cbegin(vor.vertices), cend(vor.vertices),
+		pointsMinMax,
+		minMaxXY,
+		[](const auto& vertex) { return vertex.p; }
+	);
 	constexpr auto regionSizeMultiplier = 1.61803398875;
 	const auto regionCenterX = (minX + maxX) / 2;
 	const auto regionCenterY = (minY + maxY) / 2;
@@ -983,17 +1022,21 @@ int main()
 			
 			const auto calcIsDirLeft = [](const Point& s1, const Point& s2, const Point& bads)
 			{
-				// ax + by + c = 0
-				const auto a = -(s2.y - s1.y) / (s2.x - s1.x);
-				const auto b = 1.0;
-				const auto c = -(s2.y + a * s2.x);
+				if (!isClose(s1.x, s2.x))
+				{
+					// ax + y + c = 0
+					const auto a = -(s2.y - s1.y) / (s2.x - s1.x);
+					const auto c = -(s2.y + a * s2.x);
 
-				const auto dist = (a * bads.x + b * bads.y + c);
+					const auto dist = (a * bads.x + bads.y + c);
 
-				const auto middleX = (s2.x + s1.x) / 2;
-				const auto middleY = (s2.y + s1.y) / 2;
+					const auto middleX = (s2.x + s1.x) / 2;
+					const auto middleY = (s2.y + s1.y) / 2;
 
-				return (a * (middleX + 1) + b * middleY + c) * dist > 0;
+					return (a * (middleX + 1) + middleY + c) * dist > 0;
+				}
+
+				return s1.x < bads.x;
 			};
 			const auto isDirLeft = calcIsDirLeft(points[s1], points[s2], points[bads]);
 
@@ -1006,7 +1049,6 @@ int main()
 		}
 		else
 		{
-			assert(points.size() == 2);
 			const auto s1 = e1.face;
 			const auto s2 = e2.face;
 			assert(s1 != s2);
@@ -1018,7 +1060,6 @@ int main()
 			doubleInfEdgeBYs.push_back(m * drawMaxX + f);
 		}
 	}
-	assert(doubleInfEdgeAXs.size() <= 1);
 
 	vector<size_t> delaunayEdgeAs;
 	vector<size_t> delaunayEdgeBs;
