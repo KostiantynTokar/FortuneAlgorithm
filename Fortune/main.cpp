@@ -899,12 +899,15 @@ int main()
 			make_tuple(numeric_limits<double>::max(), numeric_limits<double>::min(), numeric_limits<double>::max(), numeric_limits<double>::min()),
 			minMaxXY
 		);
-	const auto [minX, maxX, minY, maxY] = transform_reduce(
-		cbegin(vor.vertices), cbegin(vor.vertices),
-		pointsMinMax,
-		minMaxXY,
-		[](const auto& vertex) { return vertex.p; }
-	);
+	constexpr auto extendDrawRegionForAllVertices = true;
+	const auto [minX, maxX, minY, maxY] = !extendDrawRegionForAllVertices
+		? pointsMinMax
+		: transform_reduce(
+			cbegin(vor.vertices), cend(vor.vertices),
+			pointsMinMax,
+			minMaxXY,
+			[](const auto& vertex) { return vertex.p; }
+		);
 	constexpr auto regionSizeMultiplier = 1.61803398875;
 	const auto regionCenterX = (minX + maxX) / 2;
 	const auto regionCenterY = (minY + maxY) / 2;
