@@ -389,7 +389,7 @@ struct BeachLine
 			auto child = node->right;
 			if (child->balance >= 0)
 			{
-				// Right right rotation.
+				// Left left rotation.
 				replaceNode(node, child, parent);
 				node->parent = child;
 				node->right = child->left;
@@ -403,7 +403,7 @@ struct BeachLine
 			}
 			else
 			{
-				// Right left rotation.
+				// Left right rotation.
 				auto grandchild = child->left;
 				replaceNode(node, grandchild, parent);
 				node->parent = grandchild;
@@ -433,7 +433,7 @@ struct BeachLine
 			auto child = node->left;
 			if (child->balance <= 0)
 			{
-				// Left left rotation.
+				// Right right rotation.
 				replaceNode(node, child, parent);
 				node->parent = child;
 				node->left = child->right;
@@ -447,7 +447,7 @@ struct BeachLine
 			}
 			else
 			{
-				// Left right rotation.
+				// Right left rotation.
 				auto grandchild = child->right;
 				replaceNode(node, grandchild, parent);
 				node->parent = grandchild;
@@ -884,8 +884,8 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 
 int main()
 {
-	//const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6}, {-11, 11}/*, {-11, 7.5}*/ };
-	const auto points = vector<Point>{ {1, 2}, {0, 1}, {0, 0}, {0, -1}, {0, -2}, {0, -3} };
+	const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6}/*, {-11, 11}, {-11, 7.5}*/ };
+	//const auto points = vector<Point>{ {1, 2}, {0, 1}, {0, 0}, {0, -1}, {0, -2}, {0, -3}, {0, -4} };
 	//const auto points = vector<Point>{ {4, 0}, {0, 8}, {8, 2}, {7, 9} };
 	const auto vor = fortune(points);
 	const auto minMaxXY = [](const tuple<double, double, double, double>& accum, const Point& p)
