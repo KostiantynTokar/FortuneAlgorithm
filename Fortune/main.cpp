@@ -85,16 +85,19 @@ tuple<double, bool> parabolasIntersectionX(const double sweepLineY, const Point&
 {
 	const auto sx1 = site1.x;
 	const auto sx2 = site2.x;
+	const auto sy1 = site1.y;
+	const auto sy2 = site2.y;
 	const auto p1 = site1.y - sweepLineY;
 	const auto p2 = site2.y - sweepLineY;
+	assert(!isClose(p1, p2));
 
 	const auto mb = sx1 * p2 - sx2 * p1;
 
 	const auto pDiff = p2 - p1;
-	const auto pDiffSign = pDiff >= 0 ? 1.0 : -1.0;
+	const auto changeSign = pDiff < 0;
 	const auto sxDiff = sx2 - sx1;
 	const auto D = sqrt(p1 * p2 * (sxDiff * sxDiff + pDiff * pDiff));
-	return pDiffSign * site1.y > pDiffSign * site2.y ? make_tuple((mb - D) / pDiff, pDiffSign > 0.0) : make_tuple((mb + D) / pDiff, pDiffSign < 0.0);
+	return (changeSign ? sy1 < sy2 : sy1 > sy2) ? make_tuple((mb - D) / pDiff, !changeSign) : make_tuple((mb + D) / pDiff, changeSign);
 }
 
 double parabolaY(const double sweepLineY, const Point& site, const double x)
