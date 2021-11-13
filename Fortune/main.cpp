@@ -80,8 +80,8 @@ struct DoublyConnectedEdgeList
 	vector<Face> faces;
 };
 
-// Returns x-coordinate of left intersection if site1.x <= site2.x and x-coordinate of right intersection otherwise.
-double parabolasIntersectionX(const double sweepLineY, const Point& site1, const Point& site2)
+// Returns x-coordinate of an intersection of the arc1 from the left and arc2 from the right and whether it is left intersection (with lower x).
+tuple<double, bool> parabolasIntersectionX(const double sweepLineY, const Point& site1, const Point& site2)
 {
 	const auto sx1 = site1.x;
 	const auto sx2 = site2.x;
@@ -94,11 +94,7 @@ double parabolasIntersectionX(const double sweepLineY, const Point& site1, const
 	const auto pDiffSign = pDiff >= 0 ? 1.0 : -1.0;
 	const auto sxDiff = sx2 - sx1;
 	const auto D = sqrt(p1 * p2 * (sxDiff * sxDiff + pDiff * pDiff));
-	if (isClose(sx1, sx2))
-	{
-		return pDiffSign * site1.y > pDiffSign * site2.y ? (mb - D) / pDiff : (mb + D) / pDiff;
-	}
-	return pDiffSign * sx1 <= pDiffSign * sx2 ? (mb - D) / pDiff : (mb + D) / pDiff;
+	return pDiffSign * site1.y > pDiffSign * site2.y ? make_tuple((mb - D) / pDiff, pDiffSign > 0.0) : make_tuple((mb + D) / pDiff, pDiffSign < 0.0);
 }
 
 double parabolaY(const double sweepLineY, const Point& site, const double x)
@@ -174,9 +170,10 @@ struct BeachLine
 		if (node->isLeaf())
 			return node;
 
-		const auto x = parabolasIntersectionX(sweepLinePos, points[node->p], points[node->q]);
+		const auto intersectionX = get<0>(parabolasIntersectionX(sweepLinePos, points[node->p], points[node->q]));
 
-		const auto nextNode = points[site].x <= x ? node->left : node->right;
+		// TODO: case when new site's x coincides with intersection x, i.e. {-1, 1}, {1, 1}, {0, 0}.
+		const auto nextNode = points[site].x <= intersectionX ? node->left : node->right;
 		return findRegionFrom(nextNode, site, sweepLinePos);
 	}
 
@@ -202,25 +199,12 @@ struct BeachLine
 		const auto eventId = regionNode->circleEventId;
 		auto regionNodeParent = regionNode->parent;
 
-		size_t leftInd;
-		size_t rightInd;
-		if (isClose(points[intersectedArc].x, points[site].x) || points[intersectedArc].x < points[site].x)
-		{
-			leftInd = intersectedArc;
-			rightInd = site;
-		}
-		else
-		{
-			leftInd = site;
-			rightInd = intersectedArc;
-		}
-
-		auto newSubTree = new Node{ .parent = regionNodeParent, .left = nullptr, .right = nullptr, .p = leftInd, .q = rightInd, .circleEventId = -1, .balance = 0 };
+		auto newSubTree = new Node{ .parent = regionNodeParent, .left = nullptr, .right = nullptr, .p = intersectedArc, .q = site, .circleEventId = -1, .balance = 0 };
 		newSubTree->left = regionNode;
 		newSubTree->left->parent = newSubTree;
 		newSubTree->left->circleEventId = -1;
 		newSubTree->left->edgepq = -1;
-		newSubTree->right = new Node{ .parent = newSubTree, .left = nullptr, .right = nullptr, .p = rightInd, .q = leftInd, .circleEventId = -1, .balance = 0 };
+		newSubTree->right = new Node{ .parent = newSubTree, .left = nullptr, .right = nullptr, .p = site, .q = intersectedArc, .circleEventId = -1, .balance = 0 };
 		const auto redLeaf = newSubTree->right; // Rebalance, then add to this node 2 children.
 
 		auto res = NewArcInfo{
@@ -278,39 +262,21 @@ struct BeachLine
 	constexpr Node* removeArc(Node* node)
 	{
 		assert(node->isLeaf());
-		auto [leftIntersection, leftHeight] = findIntersectionWithLeftLeaf(node);
-		auto [rightIntersection, rightHeight] = findIntersectionWithRightLeaf(node);
+		const auto [leftIntersection, leftHeight] = findIntersectionWithLeftLeaf(node);
+		const auto [rightIntersection, rightHeight] = findIntersectionWithRightLeaf(node);
 		assert(leftHeight == 1 || rightHeight == 1);
 
-		auto [higherNode, lowerNode] = leftHeight > rightHeight ? make_tuple(leftIntersection, rightIntersection) : make_tuple(rightIntersection, leftIntersection);
-		auto s1 = higherNode->p == node->p ? higherNode->q : higherNode->p;
-		auto s2 = lowerNode->p == node->p ? lowerNode->q : lowerNode->p;
-		bool isNewIntersectionLeft;
-		if (points[s1].y < points[s2].y)
-			isNewIntersectionLeft = points[higherNode->p].x < points[higherNode->q].x;
-		else
-			isNewIntersectionLeft = points[lowerNode->p].x < points[lowerNode->q].x;
-		if (points[s1].x > points[s2].x)
-		{
-			auto tmp = s1;
-			s1 = s2;
-			s2 = tmp;
-		}
+		const auto s1 = leftIntersection->p == node->p ? leftIntersection->q : leftIntersection->p;
+		const auto s2 = rightIntersection->p == node->p ? rightIntersection->q : rightIntersection->p;
 
-		if (isNewIntersectionLeft)
-		{
-			higherNode->p = s1;
-			higherNode->q = s2;
-		}
-		else
-		{
-			higherNode->p = s2;
-			higherNode->q = s1;
-		}
+		const auto [higherNode, lowerNode] = leftHeight > rightHeight ? make_tuple(leftIntersection, rightIntersection) : make_tuple(rightIntersection, leftIntersection);
 
-		auto insteadLower = lowerNode->left == node ? lowerNode->right : lowerNode->left;
+		higherNode->p = s1;
+		higherNode->q = s2;
+
+		const auto insteadLower = lowerNode->left == node ? lowerNode->right : lowerNode->left;
 		auto aboveLower = lowerNode->parent;
-		if (lowerNode->isLeft())
+		if (aboveLower->left == lowerNode)
 		{
 			aboveLower->left = insteadLower;
 			++aboveLower->balance;
@@ -708,91 +674,49 @@ tuple<double, Point> circleBottomPoint(const Point& a, const Point& b, const Poi
 	return make_tuple(yc - r, Point{ xc, yc });
 }
 
-bool isConvergent(const double y, const Point& a1, const Point& a2, const Point& b1, const Point& b2)
+bool isConvergent(const double y, const Point& siteLeft, const Point& siteCenter, const Point& siteRight)
 {
-	const auto leftIntersectionX = parabolasIntersectionX(y, a1, a2);
-	const auto leftIntersectionY = parabolaY(y, a1.y > a2.y ? a1 : a2, leftIntersectionX);
-
-	const auto rightIntersectionX = parabolasIntersectionX(y, b1, b2);
-	const auto rightIntersectionY = parabolaY(y, b1.y > b2.y ? b1 : b2, rightIntersectionX);
+	const auto [leftIntersectionX, leftIntersectionGoesToLeft] = parabolasIntersectionX(y, siteLeft, siteCenter);
+	const auto [rightIntersectionX, rightIntersectionGoesToLeft] = parabolasIntersectionX(y, siteCenter, siteRight);
 
 	// y = m * x + f
-	const auto m1 = (a1.x - a2.x) / (a2.y - a1.y);
-	const auto f1 = -m1 * (a1.x + a2.x) / 2 + (a1.y + a2.y) / 2;
+	const auto m1 = (siteLeft.x - siteCenter.x) / (siteCenter.y - siteLeft.y);
+	const auto f1 = -m1 * (siteLeft.x + siteCenter.x) / 2 + (siteLeft.y + siteCenter.y) / 2;
 
-	const auto m2 = (b1.x - b2.x) / (b2.y - b1.y);
-	const auto f2 = -m2 * (b1.x + b2.x) / 2 + (b1.y + b2.y) / 2;
+	const auto m2 = (siteCenter.x - siteRight.x) / (siteRight.y - siteCenter.y);
+	const auto f2 = -m2 * (siteCenter.x + siteRight.x) / 2 + (siteCenter.y + siteRight.y) / 2;
 
 	if (isClose(m1, m2))
 	{
 		return false;
 	}
 	const auto intersectionX = (f2 - f1) / (m1 - m2);
-	const auto intersectionY = m1 * intersectionX + f1;
 
-	if (!isClose(a1.x, a2.x))
+	if (leftIntersectionGoesToLeft)
 	{
-		if (a1.x < a2.x)
-		{
-			// It is left intersection, it goes to the left.
-			if (intersectionX > leftIntersectionX)
-				return false;
-		}
-		else
-		{
-			// It is right intersection, it goes to the right.
-			if (intersectionX < leftIntersectionX)
-				return false;
-		}
+		if (leftIntersectionX < intersectionX)
+			return false;
 	}
 	else
 	{
-		if (a1.y > a2.y)
-		{
-			if (intersectionX > leftIntersectionX)
-				return false;
-		}
-		else
-		{
-			if (intersectionX < leftIntersectionX)
-				return false;
-		}
+		if (leftIntersectionX > intersectionX)
+			return false;
 	}
 
-	if (!isClose(b1.x, b2.x))
+	if (rightIntersectionGoesToLeft)
 	{
-		if (b1.x <= b2.x)
-		{
-			// It is left intersection, it goes to the left.
-			if (intersectionX > rightIntersectionX)
-				return false;
-		}
-		else
-		{
-			// It is right intersection, it goes to the right.
-			if (intersectionX < rightIntersectionX)
-				return false;
-		}
+		if (intersectionX > rightIntersectionX)
+			return false;
 	}
 	else
 	{
-		if (b1.y > b2.y)
-		{
-			if (intersectionX > rightIntersectionX)
-				return false;
-		}
-		else
-		{
-			if (intersectionX < rightIntersectionX)
-				return false;
-		}
+		if (intersectionX < rightIntersectionX)
+			return false;
 	}
 
-	const auto site1 = a1;
-	const auto site2 = a2;
-	const auto site3 = ((b1.x == a1.x && b1.y == a1.y) || (b1.x == a2.x && b1.y == a2.y)) ? b2 : b1;
-	if (y < get<0>(circleBottomPoint(site1, site2, site3)))
+	if (y < get<0>(circleBottomPoint(siteLeft, siteCenter, siteRight)))
 	{
+		// TODO: assert(false)?
 		return false;
 	}
 
@@ -815,9 +739,10 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 	{
 		if(const auto leftleftIntersection = get<0>(beachLine.findIntersectionWithLeftLeaf(left)))
 		{
-			if(isConvergent(y, points[leftleftIntersection->p], points[leftleftIntersection->q], points[leftIntersection->p], points[leftIntersection->q]))
+			if(isConvergent(y, points[leftleftIntersection->p], points[leftleftIntersection->q], points[innerLeft->p]))
 			{
-				const auto leftleftSite = leftleftIntersection->p == left->p ? leftleftIntersection->q : leftleftIntersection->p;
+				//const auto leftleftSite = leftleftIntersection->p == left->p ? leftleftIntersection->q : leftleftIntersection->p;
+				const auto leftleftSite = leftleftIntersection->p;
 				assert(leftleftSite != left->p && leftleftSite != innerLeft->p && left->p != innerLeft->p);
 				const auto [bottom, center] = circleBottomPoint(points[leftleftSite], points[left->p], points[innerLeft->p]);
 				left->circleEventId = queue.insertCircleEvent(bottom, center, left);
@@ -825,9 +750,10 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 		}
 		if (const auto rightrightIntersection = get<0>(beachLine.findIntersectionWithRightLeaf(right)))
 		{
-			if(isConvergent(y, points[rightIntersection->p], points[rightIntersection->q], points[rightrightIntersection->p], points[rightrightIntersection->q]))
+			if(isConvergent(y, points[innerRight->p], points[rightrightIntersection->p], points[rightrightIntersection->q]))
 			{
-				const auto rightrightSite = rightrightIntersection->p == right->p ? rightrightIntersection->q : rightrightIntersection->p;
+				//const auto rightrightSite = rightrightIntersection->p == right->p ? rightrightIntersection->q : rightrightIntersection->p;
+				const auto rightrightSite = rightrightIntersection->q;
 				assert(rightrightSite != right->p && rightrightSite != innerRight->p && right->p != innerRight->p);
 				const auto [bottom, center] = circleBottomPoint(points[rightrightSite], points[right->p], points[innerRight->p]);
 				right->circleEventId = queue.insertCircleEvent(bottom, center, right);
@@ -853,7 +779,10 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 			{
 				queue.removeById(intersectedArcEventId);
 			}
-			assert(central->p != left->p);
+			assert(central->p != left->p && central->p != right->p);
+			assert(left->p == right->p);
+			assert(left->p == leftCentral->p && central->p == leftCentral->q);
+			assert(central->p == centralRight->p && right->p == centralRight->q);
 			dcel.edges.push_back({ .face = central->p });
 			dcel.edges.push_back({ .face = left->p });
 			dcel.faces[central->p] = { .edge = dcel.edges.size() - 2 };
@@ -952,8 +881,8 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 
 int main()
 {
-	//const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6}, {-11, 11}/*, {-11, 7.5}*/ };
-	const auto points = vector<Point>{ {-1, 2}, {0, 1}, {0, 0}, {0, -1}, {0, -2} };
+	const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6}, {-11, 11}/*, {-11, 7.5}*/ };
+	//const auto points = vector<Point>{ {-1, 2}, {0, 1}, {0, 0}, {0, -1}, {0, -2} };
 	//const auto points = vector<Point>{ {4, 0}, {0, 8}, {8, 2}, {7, 9} };
 	const auto vor = fortune(points);
 	const auto minMaxXY = [](const tuple<double, double, double, double>& accum, const Point& p)
@@ -968,7 +897,7 @@ int main()
 			minMaxXY
 		);
 	const auto [minX, maxX, minY, maxY] = transform_reduce(
-		cbegin(vor.vertices), cend(vor.vertices),
+		cbegin(vor.vertices), cbegin(vor.vertices),
 		pointsMinMax,
 		minMaxXY,
 		[](const auto& vertex) { return vertex.p; }
