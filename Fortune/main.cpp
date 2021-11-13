@@ -269,8 +269,8 @@ struct BeachLine
 		const auto [rightIntersection, rightHeight] = findIntersectionWithRightLeaf(node);
 		assert(leftHeight == 1 || rightHeight == 1);
 
-		const auto s1 = leftIntersection->p == node->p ? leftIntersection->q : leftIntersection->p;
-		const auto s2 = rightIntersection->p == node->p ? rightIntersection->q : rightIntersection->p;
+		const auto s1 = leftIntersection->p;
+		const auto s2 = rightIntersection->q;
 
 		const auto [higherNode, lowerNode] = leftHeight > rightHeight ? make_tuple(leftIntersection, rightIntersection) : make_tuple(rightIntersection, leftIntersection);
 
@@ -440,7 +440,7 @@ struct BeachLine
 				child->right->parent = node;
 				child->right = node;
 
-				node->balance = 1 + child->balance;
+				node->balance = -1 + child->balance;
 				++child->balance;
 
 				node = child;
@@ -884,8 +884,8 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 
 int main()
 {
-	const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6}, {-11, 11}/*, {-11, 7.5}*/ };
-	//const auto points = vector<Point>{ {-1, 2}, {0, 1}, {0, 0}, {0, -1}, {0, -2} };
+	//const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6}, {-11, 11}/*, {-11, 7.5}*/ };
+	const auto points = vector<Point>{ {1, 2}, {0, 1}, {0, 0}, {0, -1}, {0, -2}, {0, -3} };
 	//const auto points = vector<Point>{ {4, 0}, {0, 8}, {8, 2}, {7, 9} };
 	const auto vor = fortune(points);
 	const auto minMaxXY = [](const tuple<double, double, double, double>& accum, const Point& p)
