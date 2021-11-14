@@ -440,7 +440,7 @@ struct BeachLine
 				child->right->parent = node;
 				child->right = node;
 
-				node->balance = -1 + child->balance;
+				node->balance = -1 - child->balance;
 				++child->balance;
 
 				node = child;
@@ -890,9 +890,9 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 
 int main()
 {
-	//const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6}, {-11, 11}/*, {-11, 7.5}*/ };
+	const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6}, {-11, 11}, {-11, 7.5} };
 	//const auto points = vector<Point>{ {1, 2}, {0, 1}, {0, 0}, {0, -1}, {0, -2}, {0, -3}, {0, -4} };
-	const auto points = vector<Point>{ {4, 0}, {0, 8}, {8, 2}, {7, 9} };
+	//const auto points = vector<Point>{ {4, 0}, {0, 8}, {8, 2}, {7, 9} };
 	//const auto points = vector<Point>{ {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-10,-6}, {-11,7}, {-2,6}, {-11, 11} };
 	const auto vor = fortune(points);
 	const auto minMaxXY = [](const tuple<double, double, double, double>& accum, const Point& p)
