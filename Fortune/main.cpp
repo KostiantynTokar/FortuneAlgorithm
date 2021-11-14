@@ -682,6 +682,12 @@ bool isConvergent(const double y, const Point& siteLeft, const Point& siteCenter
 	const auto [leftIntersectionX, leftIntersectionGoesToLeft] = parabolasIntersectionX(y, siteLeft, siteCenter);
 	const auto [rightIntersectionX, rightIntersectionGoesToLeft] = parabolasIntersectionX(y, siteCenter, siteRight);
 
+	if (leftIntersectionX == rightIntersectionX && siteCenter.y < siteLeft.y && siteCenter.y < siteRight.y)
+	{
+		// If arc has 0 width (just appears) and growth.
+		return false;
+	}
+
 	// y = m * x + f
 	const auto m1 = (siteLeft.x - siteCenter.x) / (siteCenter.y - siteLeft.y);
 	const auto f1 = -m1 * (siteLeft.x + siteCenter.x) / 2 + (siteLeft.y + siteCenter.y) / 2;
@@ -884,9 +890,10 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 
 int main()
 {
-	const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6}/*, {-11, 11}, {-11, 7.5}*/ };
+	//const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6}, {-11, 11}/*, {-11, 7.5}*/ };
 	//const auto points = vector<Point>{ {1, 2}, {0, 1}, {0, 0}, {0, -1}, {0, -2}, {0, -3}, {0, -4} };
-	//const auto points = vector<Point>{ {4, 0}, {0, 8}, {8, 2}, {7, 9} };
+	const auto points = vector<Point>{ {4, 0}, {0, 8}, {8, 2}, {7, 9} };
+	//const auto points = vector<Point>{ {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-10,-6}, {-11,7}, {-2,6}, {-11, 11} };
 	const auto vor = fortune(points);
 	const auto minMaxXY = [](const tuple<double, double, double, double>& accum, const Point& p)
 	{
