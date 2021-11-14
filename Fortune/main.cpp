@@ -80,24 +80,37 @@ struct DoublyConnectedEdgeList
 	vector<Face> faces;
 };
 
+enum class ParabolasIntersectionDirection
+{
+	left,
+	right,
+	down
+};
+
 // Returns x-coordinate of an intersection of the arc1 from the left and arc2 from the right and whether it is left intersection (with lower x).
-tuple<double, bool> parabolasIntersectionX(const double sweepLineY, const Point& site1, const Point& site2)
+tuple<double, ParabolasIntersectionDirection> parabolasIntersectionX(const double sweepLineY, const Point& site1, const Point& site2)
 {
 	const auto sx1 = site1.x;
 	const auto sx2 = site2.x;
 	const auto sy1 = site1.y;
 	const auto sy2 = site2.y;
+	if (isClose(sy1, sy2))
+	{
+		return make_tuple((sx1 + sx2) / 2, ParabolasIntersectionDirection::down);
+	}
 	const auto p1 = site1.y - sweepLineY;
 	const auto p2 = site2.y - sweepLineY;
-	assert(!isClose(p1, p2));
 
 	const auto mb = sx1 * p2 - sx2 * p1;
 
 	const auto pDiff = p2 - p1;
 	const auto changeSign = pDiff < 0;
 	const auto sxDiff = sx2 - sx1;
-	const auto D = sqrt(p1 * p2 * (sxDiff * sxDiff + pDiff * pDiff));
-	return (changeSign ? sy1 < sy2 : sy1 > sy2) ? make_tuple((mb - D) / pDiff, !changeSign) : make_tuple((mb + D) / pDiff, changeSign);
+	const auto Dsqr = p1 * p2 * (sxDiff * sxDiff + pDiff * pDiff);
+	const auto D = Dsqr > 0.0 ? sqrt(Dsqr) : 0.0;
+	return (changeSign ? sy1 < sy2 : sy1 > sy2)
+		? make_tuple((mb - D) / pDiff, changeSign ? ParabolasIntersectionDirection::right : ParabolasIntersectionDirection::left)
+		: make_tuple((mb + D) / pDiff, changeSign ? ParabolasIntersectionDirection::left : ParabolasIntersectionDirection::right);
 }
 
 double parabolaY(const double sweepLineY, const Point& site, const double x)
@@ -151,15 +164,53 @@ struct BeachLine
 	Node* root;
 	const std::vector<Point>& points;
 
-	constexpr BeachLine(const std::vector<Point>& points)
+	constexpr BeachLine(const std::vector<Point>& points, std::vector<size_t> pointsWithTheBiggestY, DoublyConnectedEdgeList& dcel)
 		: points{ points }
 		, root{ nullptr }
 	{
+		assert(pointsWithTheBiggestY.size() >= 1);
+		std::sort(
+			std::begin(pointsWithTheBiggestY), std::end(pointsWithTheBiggestY),
+			[&points](const size_t lhs, const size_t rhs)
+			{
+				return points[lhs].x < points[rhs].x;
+			});
+		root = init(std::cbegin(pointsWithTheBiggestY), std::cend(pointsWithTheBiggestY), dcel);
 	}
 
 	~BeachLine()
 	{
 		deleteRecursive(root);
+	}
+
+	template<typename It>
+	constexpr Node* init(It begin, It end, DoublyConnectedEdgeList& dcel)
+	{
+		assert(begin != end);
+		const auto dist = std::distance(begin, end);
+		if (dist == 1)
+		{
+			return new Node{ .parent = nullptr, .left = nullptr, .right = nullptr, .p = *begin, .q = 0, .circleEventId = -1, .balance = 0 };
+		}
+		const auto mid = dist / 2;
+		const auto s1 = *std::next(begin, mid - 1);
+		const auto s2 = *std::next(begin, mid);
+		const auto n = new Node{
+			.parent = nullptr,
+			.left = init(begin, std::next(begin, mid), dcel),
+			.right = init(std::next(begin, mid), end, dcel),
+			.p = s1, .q = s2,
+			.edgepq = static_cast<ptrdiff_t>(dcel.edges.size()),
+			.circleEventId = -1,
+			.balance = static_cast<signed char>(mid * 2 == dist ? 0 : 1)
+		};
+		n->left->parent = n;
+		n->right->parent = n;
+		dcel.edges.push_back({ .face = s1 });
+		dcel.edges.push_back({ .face = s2 });
+		dcel.faces[s1] = { .edge = dcel.edges.size() - 2 };
+		dcel.faces[s2] = { .edge = dcel.edges.size() - 1 };
+		return n;
 	}
 
 	constexpr Node* findRegion(const size_t site) const
@@ -175,7 +226,9 @@ struct BeachLine
 
 		const auto intersectionX = get<0>(parabolasIntersectionX(sweepLinePos, points[node->p], points[node->q]));
 
-		// TODO: case when new site's x coincides with intersection x, i.e. {-1, 1}, {1, 1}, {0, 0}.
+		// If intersection's x-coordinate equals to site's x-coordinate, then new circle event will be created and instantly processed
+		// (piece of left arc with is created and removed instantly).
+		// Then the same will happen to the right arc of this intersection.
 		const auto nextNode = points[site].x <= intersectionX ? node->left : node->right;
 		return findRegionFrom(nextNode, site, sweepLinePos);
 	}
@@ -192,11 +245,7 @@ struct BeachLine
 
 	constexpr NewArcInfo insertArc(const size_t site)
 	{
-		if (empty())
-		{
-			root = new Node{ .parent = nullptr, .left = nullptr, .right = nullptr, .p = site, .q = 0, .circleEventId = -1, .balance = 0 };
-			return { -1, nullptr, nullptr, root, nullptr, nullptr };
-		}
+		assert(!empty());
 		auto regionNode = findRegion(site);
 		const auto intersectedArc = regionNode->p;
 		const auto eventId = regionNode->circleEventId;
@@ -679,55 +728,79 @@ tuple<double, Point> circleBottomPoint(const Point& a, const Point& b, const Poi
 
 bool isConvergent(const double y, const Point& siteLeft, const Point& siteCenter, const Point& siteRight)
 {
-	const auto [leftIntersectionX, leftIntersectionGoesToLeft] = parabolasIntersectionX(y, siteLeft, siteCenter);
-	const auto [rightIntersectionX, rightIntersectionGoesToLeft] = parabolasIntersectionX(y, siteCenter, siteRight);
+	const auto [leftIntersectionX, leftIntersectionDir] = parabolasIntersectionX(y, siteLeft, siteCenter);
+	const auto [rightIntersectionX, rightIntersectionDir] = parabolasIntersectionX(y, siteCenter, siteRight);
+
+	if (leftIntersectionDir == ParabolasIntersectionDirection::down && rightIntersectionDir == ParabolasIntersectionDirection::down)
+	{
+		return false;
+	}
 
 	if (leftIntersectionX == rightIntersectionX && siteCenter.y < siteLeft.y && siteCenter.y < siteRight.y)
 	{
-		// If arc has 0 width (just appears) and growth.
+		// If arc has 0 width (just appears) and is growing.
 		return false;
 	}
 
-	// y = m * x + f
-	const auto m1 = (siteLeft.x - siteCenter.x) / (siteCenter.y - siteLeft.y);
-	const auto f1 = -m1 * (siteLeft.x + siteCenter.x) / 2 + (siteLeft.y + siteCenter.y) / 2;
+	// a * y + b * x + c = 0
+	const auto a1 = (siteCenter.y - siteLeft.y);
+	const auto b1 = (siteCenter.x - siteLeft.x);
+	const auto c1 = -b1 * (siteLeft.x + siteCenter.x) / 2 - a1 * (siteLeft.y + siteCenter.y) / 2;
 
-	const auto m2 = (siteCenter.x - siteRight.x) / (siteRight.y - siteCenter.y);
-	const auto f2 = -m2 * (siteCenter.x + siteRight.x) / 2 + (siteCenter.y + siteRight.y) / 2;
+	const auto a2 = (siteRight.y - siteCenter.y);
+	const auto b2 = (siteRight.x - siteCenter.x);
+	const auto c2 = -b2 * (siteCenter.x + siteRight.x) / 2 - a2 * (siteCenter.y + siteRight.y) / 2;
 
-	if (isClose(m1, m2))
+	assert(!isCloseToZero(a1) || !isCloseToZero(a2));
+
+	const auto denom = a2 * b1 - a1 * b2;
+	if (isCloseToZero(denom))
 	{
+		// Lines are parallel, there is no intersection.
 		return false;
 	}
-	const auto intersectionX = (f2 - f1) / (m1 - m2);
+	const auto intersectionX = (a1 * c2 - a2 * c1) / denom;
 
-	if (leftIntersectionGoesToLeft)
+	switch (leftIntersectionDir)
 	{
-		if (leftIntersectionX < intersectionX)
-			return false;
-	}
-	else
-	{
-		if (leftIntersectionX > intersectionX)
-			return false;
-	}
-
-	if (rightIntersectionGoesToLeft)
-	{
-		if (intersectionX > rightIntersectionX)
-			return false;
-	}
-	else
-	{
-		if (intersectionX < rightIntersectionX)
-			return false;
+		break; case ParabolasIntersectionDirection::left:
+		{
+			if (leftIntersectionX < intersectionX)
+				return false;
+		}
+		break; case ParabolasIntersectionDirection::right:
+		{
+			if (leftIntersectionX > intersectionX)
+				return false;
+		}
+		break; case ParabolasIntersectionDirection::down:
+		{
+			if (!isClose(leftIntersectionX, intersectionX))
+				return false;
+		}
 	}
 
-	if (y < get<0>(circleBottomPoint(siteLeft, siteCenter, siteRight)))
+	switch (rightIntersectionDir)
 	{
-		// TODO: assert(false)?
-		return false;
+		break; case ParabolasIntersectionDirection::left:
+		{
+			if (intersectionX > rightIntersectionX)
+				return false;
+		}
+		break; case ParabolasIntersectionDirection::right:
+		{
+			if (intersectionX < rightIntersectionX)
+				return false;
+		}
+		break; case ParabolasIntersectionDirection::down:
+		{
+			if (!isClose(rightIntersectionX, intersectionX))
+				return false;
+		}
 	}
+
+	// TODO: if this assert is false, then return false in this case.
+	assert(isClose(y, get<0>(circleBottomPoint(siteLeft, siteCenter, siteRight))) || y > get<0>(circleBottomPoint(siteLeft, siteCenter, siteRight)));
 
 	return true;
 }
@@ -739,7 +812,19 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 	dcel.faces.resize(points.size());
 
 	auto queue = PriorityQueue{ points };
-	auto beachLine = BeachLine{ points };
+
+	if (queue.empty())
+	{
+		return dcel;
+	}
+
+	auto pointsWithTheBiggestY = vector<size_t>{};
+	do
+	{
+		pointsWithTheBiggestY.push_back(get<1>(queue.pop()));
+	} while (!queue.empty() && isClose(queue.storage[0].y, points[pointsWithTheBiggestY.back()].y));
+	
+	auto beachLine = BeachLine{ points, std::move(pointsWithTheBiggestY), dcel };
 
 	const auto createCircleEvents = [&points, &queue, &beachLine]
 	(const double y,
@@ -769,12 +854,6 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 			}
 		}
 	};
-
-	if (!queue.empty())
-	{
-		const auto [ev, evId] = queue.pop();
-		beachLine.insertArc(evId);
-	}
 
 	while (!queue.empty())
 	{
@@ -890,10 +969,14 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 
 int main()
 {
-	const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6}, {-11, 11}, {-11, 7.5} };
+	//const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6}, {-11, 11}, {-11, 7.5} };
 	//const auto points = vector<Point>{ {1, 2}, {0, 1}, {0, 0}, {0, -1}, {0, -2}, {0, -3}, {0, -4} };
 	//const auto points = vector<Point>{ {4, 0}, {0, 8}, {8, 2}, {7, 9} };
 	//const auto points = vector<Point>{ {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-10,-6}, {-11,7}, {-2,6}, {-11, 11} };
+	//const auto points = vector<Point>{ {-1, 1}, {1, 1}, {0, 0}, {3, 1} };
+	// auto points = vector<Point>{ {0, 2}, {0, 1}, {0, 0}, {0, -1}, {0, -2} };
+	//const auto points = vector<Point>{ {-1, 1}, {1, 1}, {3, 1}, {0, 4}, {2, 4}, {-1, 7}, {1, 7}, {5, 7} };
+	const auto points = vector<Point>{ {0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4}, {4, 0}, {4, 1}, {4, 2}, {4, 3}, {4, 4}, {1, 0}, {2, 0}, {3, 0}, {1, 4}, {2, 4}, {3, 4} };
 	const auto vor = fortune(points);
 	const auto minMaxXY = [](const tuple<double, double, double, double>& accum, const Point& p)
 	{
@@ -961,45 +1044,74 @@ int main()
 			// bads - site opposite to the ray, sOpposite.
 			const auto bads = vor.edges[ePrevTwinInd].face;
 			assert(s1 != s2 && s1 != bads && s2 != bads);
-			
-			const auto calcIsDirLeft = [](const Point& s1, const Point& s2, const Point& bads)
-			{
-				if (!isClose(s1.x, s2.x))
-				{
-					// ax + y + c = 0
-					const auto a = -(s2.y - s1.y) / (s2.x - s1.x);
-					const auto c = -(s2.y + a * s2.x);
 
-					const auto dist = (a * bads.x + bads.y + c);
-
-					const auto middleX = (s2.x + s1.x) / 2;
-					const auto middleY = (s2.y + s1.y) / 2;
-
-					return (a * (middleX + 1) + middleY + c) * dist > 0;
-				}
-
-				return s1.x < bads.x;
-			};
-			const auto isDirLeft = calcIsDirLeft(points[s1], points[s2], points[bads]);
-
-			// Ray: y = m * x + f
-			const auto m = (points[s1].x - points[s2].x) / (points[s2].y - points[s1].y);
-			const auto f = -m * (points[s1].x + points[s2].x) / 2 + (points[s1].y + points[s2].y) / 2;
 			infEdgeAs.push_back(e.vertexFrom);
-			infEdgeBXs.push_back(isDirLeft ? drawMinX : drawMaxX);
-			infEdgeBYs.push_back(m * infEdgeBXs.back() + f);
+
+			// a * y + b * x + c = 0
+			const auto a = points[s2].y - points[s1].y;
+			const auto b = points[s2].x - points[s1].x;
+			const auto c = -b * (points[s1].x + points[s2].x) / 2 - a * (points[s1].y + points[s2].y) / 2;
+
+			if (isCloseToZero(a))
+			{
+				infEdgeBXs.push_back(-c / b);
+				infEdgeBYs.push_back(points[bads].y < points[s1].y ? drawMaxY : drawMinY);
+			}
+			else
+			{
+				const auto calcIsDirLeft = [](const Point& s1, const Point& s2, const Point& bads)
+				{
+					if (!isClose(s1.x, s2.x))
+					{
+						// ax + y + c = 0
+						const auto a = -(s2.y - s1.y) / (s2.x - s1.x);
+						const auto c = -(s2.y + a * s2.x);
+
+						const auto dist = (a * bads.x + bads.y + c);
+
+						const auto middleX = (s2.x + s1.x) / 2;
+						const auto middleY = (s2.y + s1.y) / 2;
+
+						return (a * (middleX + 1) + middleY + c) * dist > 0;
+					}
+
+					return s1.x < bads.x;
+				};
+				const auto isDirLeft = calcIsDirLeft(points[s1], points[s2], points[bads]);
+
+				// Ray: y = m * x + f
+				const auto m = (points[s1].x - points[s2].x) / (points[s2].y - points[s1].y);
+				const auto f = -m * (points[s1].x + points[s2].x) / 2 + (points[s1].y + points[s2].y) / 2;
+				infEdgeBXs.push_back(isDirLeft ? drawMinX : drawMaxX);
+				infEdgeBYs.push_back(m * infEdgeBXs.back() + f);
+			}
 		}
 		else
 		{
 			const auto s1 = e1.face;
 			const auto s2 = e2.face;
 			assert(s1 != s2);
-			const auto m = (points[s1].x - points[s2].x) / (points[s2].y - points[s1].y);
-			const auto f = -m * (points[s1].x + points[s2].x) / 2 + (points[s1].y + points[s2].y) / 2;
-			doubleInfEdgeAXs.push_back(drawMinX);
-			doubleInfEdgeAYs.push_back(m * drawMinX + f);
-			doubleInfEdgeBXs.push_back(drawMaxX);
-			doubleInfEdgeBYs.push_back(m * drawMaxX + f);
+			const auto a = points[s2].y - points[s1].y;
+			const auto b = points[s2].x - points[s1].x;
+			const auto c = -b * (points[s1].x + points[s2].x) / 2 - a * (points[s1].y + points[s2].y) / 2;
+			/*const auto m = (points[s1].x - points[s2].x) / (points[s2].y - points[s1].y);
+			const auto f = -m * (points[s1].x + points[s2].x) / 2 + (points[s1].y + points[s2].y) / 2;*/
+			if (isCloseToZero(a))
+			{
+				doubleInfEdgeAXs.push_back(-c / b);
+				doubleInfEdgeAYs.push_back(drawMinY);
+				doubleInfEdgeBXs.push_back(-c / b);
+				doubleInfEdgeBYs.push_back(drawMaxY);
+			}
+			else
+			{
+				doubleInfEdgeAXs.push_back(drawMinX);
+				//doubleInfEdgeAYs.push_back(m * drawMinX + f);
+				doubleInfEdgeAYs.push_back(-(b * drawMinX + c) / a);
+				doubleInfEdgeBXs.push_back(drawMaxX);
+				//doubleInfEdgeBYs.push_back(m * drawMaxX + f);
+				doubleInfEdgeBYs.push_back(-(b * drawMaxX + c) / a);
+			}
 		}
 	}
 
