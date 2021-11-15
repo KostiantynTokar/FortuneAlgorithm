@@ -72,7 +72,6 @@ struct DoublyConnectedEdgeList
 		size_t face;
 
 		ptrdiff_t next = -1; // -1 if there is no next (infinite edge).
-		ptrdiff_t prev = -1;
 
 		// NOTE: twin edges located in sequence in edges array, i.e., edges[2 * i] and edges[2 * i + 1] are twins.
 	};
@@ -952,12 +951,12 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 				if (edges[centralEdgepq].face == sLeft)
 				{
 					edges[centralEdgepq].next = edges[leftEdgepq].face == sLeft ? leftEdgepq : leftEdgepq + 1;
-					edges[centralEdgepq + 1].prev = edges[rightEdgepq].face == sRight ? rightEdgepq : rightEdgepq + 1;
+					edges[rightEdgepq].face == sRight ? rightEdgepq : rightEdgepq + 1;
 				}
 				else
 				{
 					edges[centralEdgepq + 1].next = edges[leftEdgepq].face == sLeft ? leftEdgepq : leftEdgepq + 1;
-					edges[centralEdgepq].prev = edges[rightEdgepq].face == sRight ? rightEdgepq : rightEdgepq + 1;
+					edges[rightEdgepq].face == sRight ? rightEdgepq : rightEdgepq + 1;
 				}
 			};
 
@@ -1066,7 +1065,8 @@ int main()
 			// s1, s2 - sLeft, sRight.
 			const auto s1 = e.face;
 			const auto s2 = vor.edges[eTwinInd].face;
-			const auto ePrevTwinInd = e.prev % 2 == 0 ? e.prev + 1 : e.prev - 1;
+			const auto ePrevInd = vor.edges[eTwinInd].next;
+			const auto ePrevTwinInd = ePrevInd % 2 == 0 ? ePrevInd + 1 : ePrevInd - 1;
 			// bads - site opposite to the ray, sOpposite.
 			const auto bads = vor.edges[ePrevTwinInd].face;
 			assert(s1 != s2 && s1 != bads && s2 != bads);
