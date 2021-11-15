@@ -731,6 +731,11 @@ bool isConvergent(const double y, const Point& siteLeft, const Point& siteCenter
 	const auto [leftIntersectionX, leftIntersectionDir] = parabolasIntersectionX(y, siteLeft, siteCenter);
 	const auto [rightIntersectionX, rightIntersectionDir] = parabolasIntersectionX(y, siteCenter, siteRight);
 
+	if (leftIntersectionX > rightIntersectionX && definitelyLessThan(y, siteCenter.y))
+	{
+		return true;
+	}
+
 	if (leftIntersectionDir == ParabolasIntersectionDirection::down && rightIntersectionDir == ParabolasIntersectionDirection::down)
 	{
 		return false;
@@ -765,12 +770,12 @@ bool isConvergent(const double y, const Point& siteLeft, const Point& siteCenter
 	{
 		break; case ParabolasIntersectionDirection::left:
 		{
-			if (leftIntersectionX < intersectionX)
+			if (definitelyLessThan(leftIntersectionX, intersectionX))
 				return false;
 		}
 		break; case ParabolasIntersectionDirection::right:
 		{
-			if (leftIntersectionX > intersectionX)
+			if (definitelyGreaterThan(leftIntersectionX, intersectionX))
 				return false;
 		}
 		break; case ParabolasIntersectionDirection::down:
@@ -784,12 +789,12 @@ bool isConvergent(const double y, const Point& siteLeft, const Point& siteCenter
 	{
 		break; case ParabolasIntersectionDirection::left:
 		{
-			if (intersectionX > rightIntersectionX)
+			if (definitelyGreaterThan(intersectionX, rightIntersectionX))
 				return false;
 		}
 		break; case ParabolasIntersectionDirection::right:
 		{
-			if (intersectionX < rightIntersectionX)
+			if (definitelyLessThan(intersectionX, rightIntersectionX))
 				return false;
 		}
 		break; case ParabolasIntersectionDirection::down:
@@ -974,9 +979,10 @@ int main()
 	//const auto points = vector<Point>{ {4, 0}, {0, 8}, {8, 2}, {7, 9} };
 	//const auto points = vector<Point>{ {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-10,-6}, {-11,7}, {-2,6}, {-11, 11} };
 	//const auto points = vector<Point>{ {-1, 1}, {1, 1}, {0, 0}, {3, 1} };
-	// auto points = vector<Point>{ {0, 2}, {0, 1}, {0, 0}, {0, -1}, {0, -2} };
+	//auto points = vector<Point>{ {0, 2}, {0, 1}, {0, 0}, {0, -1}, {0, -2} };
 	//const auto points = vector<Point>{ {-1, 1}, {1, 1}, {3, 1}, {0, 4}, {2, 4}, {-1, 7}, {1, 7}, {5, 7} };
 	const auto points = vector<Point>{ {0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4}, {4, 0}, {4, 1}, {4, 2}, {4, 3}, {4, 4}, {1, 0}, {2, 0}, {3, 0}, {1, 4}, {2, 4}, {3, 4} };
+	//const auto points = vector<Point>{ {0, 2}, {2, 4}, {4, 2}, {2, 0}, {0, 1}, {1, 0} };
 	const auto vor = fortune(points);
 	const auto minMaxXY = [](const tuple<double, double, double, double>& accum, const Point& p)
 	{
