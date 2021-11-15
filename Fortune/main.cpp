@@ -732,19 +732,19 @@ bool isConvergent(const double y, const Point& siteLeft, const Point& siteCenter
 	const auto [leftIntersectionX, leftIntersectionDir] = parabolasIntersectionX(y, siteLeft, siteCenter);
 	const auto [rightIntersectionX, rightIntersectionDir] = parabolasIntersectionX(y, siteCenter, siteRight);
 
+	// This 2 ifs handle rounding errors.
 	if (isClose(leftIntersectionX, rightIntersectionX) && definitelyLessThan(y, siteCenter.y))
 	{
 		return true;
 	}
-
-	if (leftIntersectionDir == ParabolasIntersectionDirection::down && rightIntersectionDir == ParabolasIntersectionDirection::down)
-	{
-		return false;
-	}
-
 	if (isClose(leftIntersectionX, rightIntersectionX) && siteCenter.y < siteLeft.y && siteCenter.y < siteRight.y)
 	{
 		// If arc has 0 width (just appears) and is growing.
+		return false;
+	}
+
+	if (leftIntersectionDir == ParabolasIntersectionDirection::down && rightIntersectionDir == ParabolasIntersectionDirection::down)
+	{
 		return false;
 	}
 
