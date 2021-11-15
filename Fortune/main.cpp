@@ -74,6 +74,7 @@ struct DoublyConnectedEdgeList
 		ptrdiff_t next = -1; // -1 if there is no next (infinite edge).
 
 		// NOTE: twin edges located in sequence in edges array, i.e., edges[2 * i] and edges[2 * i + 1] are twins.
+		// NOTE: prev = twin->next->twin->next->twin
 	};
 	vector<Edge> edges; // up to n^2 elements?
 	vector<Vertex> vertices;
@@ -979,7 +980,7 @@ int main()
 	//const auto points = vector<Point>{ {4, 0}, {0, 8}, {8, 2}, {7, 9} };
 	//const auto points = vector<Point>{ {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-10,-6}, {-11,7}, {-2,6}, {-11, 11} };
 	//const auto points = vector<Point>{ {-1, 1}, {1, 1}, {0, 0}, {3, 1} };
-	//auto points = vector<Point>{ {0, 2}, {0, 1}, {0, 0}, {0, -1}, {0, -2} };
+	//const auto points = vector<Point>{ {0, 2}, {0, 1}, {0, 0}, {0, -1}, {0, -2} };
 	//const auto points = vector<Point>{ {-1, 1}, {1, 1}, {3, 1}, {0, 4}, {2, 4}, {-1, 7}, {1, 7}, {5, 7} };
 	//const auto points = vector<Point>{ {0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4}, {4, 0}, {4, 1}, {4, 2}, {4, 3}, {4, 4}, {1, 0}, {2, 0}, {3, 0}, {1, 4}, {2, 4}, {3, 4} };
 	//const auto points = vector<Point>{ {0, 2}, {2, 4}, {4, 2}, {2, 0}, {0, 1}, {1, 0} };
@@ -1065,7 +1066,11 @@ int main()
 			// s1, s2 - sLeft, sRight.
 			const auto s1 = e.face;
 			const auto s2 = vor.edges[eTwinInd].face;
-			const auto ePrevInd = vor.edges[eTwinInd].next;
+			// prev = twin->next->twin->next->twin
+			const auto eTwinNextInd = vor.edges[eTwinInd].next;
+			const auto eTwinNextTwinInd = eTwinNextInd % 2 == 0 ? eTwinNextInd + 1 : eTwinNextInd - 1;
+			const auto eTwinNextTwinNext = vor.edges[eTwinNextTwinInd].next;
+			const auto ePrevInd = eTwinNextTwinNext % 2 == 0 ? eTwinNextTwinNext + 1 : eTwinNextTwinNext - 1;
 			const auto ePrevTwinInd = ePrevInd % 2 == 0 ? ePrevInd + 1 : ePrevInd - 1;
 			// bads - site opposite to the ray, sOpposite.
 			const auto bads = vor.edges[ePrevTwinInd].face;
@@ -1120,8 +1125,6 @@ int main()
 			const auto a = points[s2].y - points[s1].y;
 			const auto b = points[s2].x - points[s1].x;
 			const auto c = -b * (points[s1].x + points[s2].x) / 2 - a * (points[s1].y + points[s2].y) / 2;
-			/*const auto m = (points[s1].x - points[s2].x) / (points[s2].y - points[s1].y);
-			const auto f = -m * (points[s1].x + points[s2].x) / 2 + (points[s1].y + points[s2].y) / 2;*/
 			if (isCloseToZero(a))
 			{
 				doubleInfEdgeAXs.push_back(-c / b);
@@ -1132,10 +1135,8 @@ int main()
 			else
 			{
 				doubleInfEdgeAXs.push_back(drawMinX);
-				//doubleInfEdgeAYs.push_back(m * drawMinX + f);
 				doubleInfEdgeAYs.push_back(-(b * drawMinX + c) / a);
 				doubleInfEdgeBXs.push_back(drawMaxX);
-				//doubleInfEdgeBYs.push_back(m * drawMaxX + f);
 				doubleInfEdgeBYs.push_back(-(b * drawMaxX + c) / a);
 			}
 		}
