@@ -3,6 +3,7 @@
 #include <numeric>
 #include <tuple>
 #include <limits>
+#include <numbers>
 #include <cassert>
 
 #include <pybind11/pybind11.h>
@@ -13,6 +14,19 @@
 using namespace std;
 namespace py = pybind11;
 using namespace py::literals;
+
+bool isClose(double a, double b, double maxRelDiff = 1e-9, double maxAbsDiff = 1e-10)
+{
+	const auto diff = abs(a - b);
+	return diff <= maxRelDiff * abs(a)
+		|| diff <= maxRelDiff * abs(b)
+		|| diff <= maxAbsDiff;
+}
+
+bool isCloseToZero(double a, double maxAbsDiff = 1e-10)
+{
+	return isClose(a, 0.0, 0.0, maxAbsDiff);
+}
 
 bool approximatelyEqual(double a, double b, double epsilon = numeric_limits<double>::epsilon())
 {
@@ -32,19 +46,6 @@ bool definitelyGreaterThan(double a, double b, double epsilon = numeric_limits<d
 bool definitelyLessThan(double a, double b, double epsilon = numeric_limits<double>::epsilon())
 {
 	return (b - a) > ((abs(a) < abs(b) ? abs(b) : abs(a)) * epsilon);
-}
-
-bool isClose(double a, double b, double maxRelDiff = 1e-9, double maxAbsDiff = 1e-50)
-{
-	const auto diff = abs(a - b);
-	return diff <= maxRelDiff * abs(a)
-		|| diff <= maxRelDiff * abs(b)
-		|| diff <= maxAbsDiff;
-}
-
-bool isCloseToZero(double a, double maxAbsDiff = 1e-50)
-{
-	return isClose(a, 0.0, 0.0, maxAbsDiff);
 }
 
 struct Point
@@ -731,7 +732,7 @@ bool isConvergent(const double y, const Point& siteLeft, const Point& siteCenter
 	const auto [leftIntersectionX, leftIntersectionDir] = parabolasIntersectionX(y, siteLeft, siteCenter);
 	const auto [rightIntersectionX, rightIntersectionDir] = parabolasIntersectionX(y, siteCenter, siteRight);
 
-	if (leftIntersectionX > rightIntersectionX && definitelyLessThan(y, siteCenter.y))
+	if (isClose(leftIntersectionX, rightIntersectionX) && definitelyLessThan(y, siteCenter.y))
 	{
 		return true;
 	}
@@ -741,7 +742,7 @@ bool isConvergent(const double y, const Point& siteLeft, const Point& siteCenter
 		return false;
 	}
 
-	if (leftIntersectionX == rightIntersectionX && siteCenter.y < siteLeft.y && siteCenter.y < siteRight.y)
+	if (isClose(leftIntersectionX, rightIntersectionX) && siteCenter.y < siteLeft.y && siteCenter.y < siteRight.y)
 	{
 		// If arc has 0 width (just appears) and is growing.
 		return false;
@@ -981,8 +982,27 @@ int main()
 	//const auto points = vector<Point>{ {-1, 1}, {1, 1}, {0, 0}, {3, 1} };
 	//auto points = vector<Point>{ {0, 2}, {0, 1}, {0, 0}, {0, -1}, {0, -2} };
 	//const auto points = vector<Point>{ {-1, 1}, {1, 1}, {3, 1}, {0, 4}, {2, 4}, {-1, 7}, {1, 7}, {5, 7} };
-	const auto points = vector<Point>{ {0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4}, {4, 0}, {4, 1}, {4, 2}, {4, 3}, {4, 4}, {1, 0}, {2, 0}, {3, 0}, {1, 4}, {2, 4}, {3, 4} };
+	//const auto points = vector<Point>{ {0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4}, {4, 0}, {4, 1}, {4, 2}, {4, 3}, {4, 4}, {1, 0}, {2, 0}, {3, 0}, {1, 4}, {2, 4}, {3, 4} };
 	//const auto points = vector<Point>{ {0, 2}, {2, 4}, {4, 2}, {2, 0}, {0, 1}, {1, 0} };
+	//const auto points = vector<Point>{ {0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4},
+	// 									{4, 0}, {4, 1}, {4, 2}, {4, 3}, {4, 4},
+	// 									{1, 0}, {1, 1}, {1, 2}, {1, 3}, {1, 4},
+	// 									{2, 0}, {2, 1}, {2, 2}, {2, 3}, {2, 4},
+	// 									{3, 0}, {3, 1}, {3, 2}, {3, 3}, {3, 4}
+	//};
+	//const auto points = vector<Point>{ {0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4},
+	//									{4, 0}, {4, 1}, {4, 2}, {4, 3}, {4, 4},
+	//									{1, 0}, {1, 1}, {1, 2}, {1, 3}, {1, 4},
+	//									{3, 0}, {3, 1}, {3, 2}, {3, 3}, {3, 4}
+	//};
+	auto points = vector<Point>{ {0, 0} };
+	const auto pointsNumber = 20;
+	for (int i{ 0 }; i != pointsNumber; ++i)
+	{
+		points.push_back({ cos(2.0 * i * std::numbers::pi / pointsNumber), sin(2.0 * i * std::numbers::pi / pointsNumber) });
+		points.push_back({ 4.0 * cos(2.0 * i * std::numbers::pi / pointsNumber), 3.0 * sin(2.0 * i * std::numbers::pi / pointsNumber) });
+		points.push_back({ 5.0 * cos(2.0 * i * std::numbers::pi / pointsNumber), 7.0 * sin(2.0 * i * std::numbers::pi / pointsNumber) });
+	}
 	const auto vor = fortune(points);
 	const auto minMaxXY = [](const tuple<double, double, double, double>& accum, const Point& p)
 	{
