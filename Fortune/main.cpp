@@ -978,84 +978,68 @@ int main()
 			edgeAs.push_back(e1.vertexFrom);
 			edgeBs.push_back(e2.vertexFrom);
 		}
-		else if (e1.vertexFrom != -1 || e2.vertexFrom != -1)
+		else // Infinite of half-infinite edge.
 		{
-			const auto& [e, eTwinInd] = e1.vertexFrom == -1 ? make_tuple(e2, i) : make_tuple(e1, i + 1);
-			// s1, s2 - sLeft, sRight.
-			const auto s1 = e.face;
-			const auto s2 = vor.edges[eTwinInd].face;
-			// prev = twin->next->twin->next->twin
-			const auto eTwinNextInd = vor.edges[eTwinInd].next;
-			const auto eTwinNextTwinInd = eTwinNextInd % 2 == 0 ? eTwinNextInd + 1 : eTwinNextInd - 1;
-			const auto eTwinNextTwinNext = vor.edges[eTwinNextTwinInd].next;
-			const auto ePrevInd = eTwinNextTwinNext % 2 == 0 ? eTwinNextTwinNext + 1 : eTwinNextTwinNext - 1;
-			const auto ePrevTwinInd = ePrevInd % 2 == 0 ? ePrevInd + 1 : ePrevInd - 1;
-			// bads - site opposite to the ray, sOpposite.
-			const auto bads = vor.edges[ePrevTwinInd].face;
-			assert(s1 != s2 && s1 != bads && s2 != bads);
-
-			infEdgeAs.push_back(e.vertexFrom);
-
+			const auto s1 = e1.face;
+			const auto s2 = e2.face;
+			assert(s1 != s2);
 			// a * y + b * x + c = 0
 			const auto a = points[s2].y - points[s1].y;
 			const auto b = points[s2].x - points[s1].x;
 			const auto c = -b * (points[s1].x + points[s2].x) / 2 - a * (points[s1].y + points[s2].y) / 2;
 
-			if (isCloseToZero(a))
+			if (e1.vertexFrom != -1 || e2.vertexFrom != -1)
 			{
-				infEdgeBXs.push_back(-c / b);
-				infEdgeBYs.push_back(points[bads].y < points[s1].y ? drawMaxY : drawMinY);
-			}
-			else
-			{
-				const auto calcIsDirLeft = [](const Point& s1, const Point& s2, const Point& bads)
+				const auto& [e, eTwinInd] = e1.vertexFrom == -1 ? make_tuple(e2, i) : make_tuple(e1, i + 1);
+				// prev = twin->next->twin->next->twin
+				const auto eTwinNextInd = vor.edges[eTwinInd].next;
+				const auto eTwinNextTwinInd = eTwinNextInd % 2 == 0 ? eTwinNextInd + 1 : eTwinNextInd - 1;
+				const auto ePrevTwinInd = vor.edges[eTwinNextTwinInd].next;
+				// bads - site opposite to the ray, sOpposite.
+				const auto bads = vor.edges[ePrevTwinInd].face;
+				assert(s1 != bads && s2 != bads);
+
+				infEdgeAs.push_back(e.vertexFrom);
+
+				if (isCloseToZero(a))
 				{
-					if (!isClose(s1.x, s2.x))
+					infEdgeBXs.push_back(-c / b);
+					infEdgeBYs.push_back(points[bads].y < points[s1].y ? drawMaxY : drawMinY);
+				}
+				else
+				{
+					const auto isDirLeft = isClose(points[s1].x, points[s2].x)
+						? points[s1].x < points[bads].x
+						: [a, b, &s1 = points[s1], &bads = points[bads]]()
 					{
-						// ax + y + c = 0
-						const auto a = -(s2.y - s1.y) / (s2.x - s1.x);
-						const auto c = -(s2.y + a * s2.x);
+						const auto perpA = -b;
+						const auto perpB = a;
+						const auto perpC = -perpA * s1.y - perpB * s1.x;
+						const auto distToBads = perpA * bads.y + perpB * bads.x + perpC;
+						const auto distToPointToRight = perpA * s1.y + perpB * (s1.x + 1) + perpC;
+						return distToPointToRight * distToBads > 0;
+					}();
 
-						const auto dist = (a * bads.x + bads.y + c);
-
-						const auto middleX = (s2.x + s1.x) / 2;
-						const auto middleY = (s2.y + s1.y) / 2;
-
-						return (a * (middleX + 1) + middleY + c) * dist > 0;
-					}
-
-					return s1.x < bads.x;
-				};
-				const auto isDirLeft = calcIsDirLeft(points[s1], points[s2], points[bads]);
-
-				// Ray: y = m * x + f
-				const auto m = (points[s1].x - points[s2].x) / (points[s2].y - points[s1].y);
-				const auto f = -m * (points[s1].x + points[s2].x) / 2 + (points[s1].y + points[s2].y) / 2;
-				infEdgeBXs.push_back(isDirLeft ? drawMinX : drawMaxX);
-				infEdgeBYs.push_back(m * infEdgeBXs.back() + f);
+					infEdgeBXs.push_back(isDirLeft ? drawMinX : drawMaxX);
+					infEdgeBYs.push_back(-(b * infEdgeBXs.back() + c) / a);
+				}
 			}
-		}
-		else
-		{
-			const auto s1 = e1.face;
-			const auto s2 = e2.face;
-			assert(s1 != s2);
-			const auto a = points[s2].y - points[s1].y;
-			const auto b = points[s2].x - points[s1].x;
-			const auto c = -b * (points[s1].x + points[s2].x) / 2 - a * (points[s1].y + points[s2].y) / 2;
-			if (isCloseToZero(a))
+			else // Infinite edge.
 			{
-				doubleInfEdgeAXs.push_back(-c / b);
-				doubleInfEdgeAYs.push_back(drawMinY);
-				doubleInfEdgeBXs.push_back(-c / b);
-				doubleInfEdgeBYs.push_back(drawMaxY);
-			}
-			else
-			{
-				doubleInfEdgeAXs.push_back(drawMinX);
-				doubleInfEdgeAYs.push_back(-(b * drawMinX + c) / a);
-				doubleInfEdgeBXs.push_back(drawMaxX);
-				doubleInfEdgeBYs.push_back(-(b * drawMaxX + c) / a);
+				if (isCloseToZero(a))
+				{
+					doubleInfEdgeAXs.push_back(-c / b);
+					doubleInfEdgeAYs.push_back(drawMinY);
+					doubleInfEdgeBXs.push_back(-c / b);
+					doubleInfEdgeBYs.push_back(drawMaxY);
+				}
+				else
+				{
+					doubleInfEdgeAXs.push_back(drawMinX);
+					doubleInfEdgeAYs.push_back(-(b * drawMinX + c) / a);
+					doubleInfEdgeBXs.push_back(drawMaxX);
+					doubleInfEdgeBYs.push_back(-(b * drawMaxX + c) / a);
+				}
 			}
 		}
 	}
