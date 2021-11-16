@@ -10,6 +10,7 @@
 #include <pybind11/embed.h>
 #include <pybind11/stl.h>
 #include <pybind11/eval.h>
+#include <pybind11/numpy.h>
 
 using namespace std;
 namespace py = pybind11;
@@ -891,6 +892,15 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 	return dcel;
 }
 
+template<typename Seq>
+auto to_pyarray(Seq&& seq)
+{
+	using ValSeq = std::remove_reference_t<Seq>;
+	auto seq_ptr = new ValSeq(std::forward<Seq>(seq));
+	auto capsule = py::capsule(seq_ptr, [](void* p) { delete reinterpret_cast<ValSeq*>(p); });
+	return py::array(seq_ptr->size(), seq_ptr->data(), capsule);
+}
+
 int main()
 {
 	//const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6}, {-11, 11}, {-11, 7.5} };
@@ -1067,45 +1077,43 @@ int main()
 
 		py::dict locals{
 			"drawMinX"_a = drawMinX, "drawMaxX"_a = drawMaxX, "drawMinY"_a = drawMinY, "drawMaxY"_a = drawMaxY,
-			"vertexXs"_a = vertexXs, "vertexYs"_a = vertexYs,
-			"edgeAs"_a = edgeAs, "edgeBs"_a = edgeBs,
-			"infEdgeAs"_a = infEdgeAs, "infEdgeBXs"_a = infEdgeBXs, "infEdgeBYs"_a = infEdgeBYs,
-			"doubleInfEdgeAXs"_a = doubleInfEdgeAXs, "doubleInfEdgeAYs"_a = doubleInfEdgeAYs, "doubleInfEdgeBXs"_a = doubleInfEdgeBXs, "doubleInfEdgeBYs"_a = doubleInfEdgeBYs,
-			"delaunayEdgeAs"_a = delaunayEdgeAs, "delaunayEdgeBs"_a = delaunayEdgeBs,
-			"pointXs"_a = pointXs, "pointYs"_a = pointYs
+			"vertexXs"_a = to_pyarray(move(vertexXs)), "vertexYs"_a = to_pyarray(move(vertexYs)),
+			"edgeAs"_a = to_pyarray(move(edgeAs)), "edgeBs"_a = to_pyarray(move(edgeBs)),
+			"infEdgeAs"_a = to_pyarray(move(infEdgeAs)), "infEdgeBXs"_a = to_pyarray(move(infEdgeBXs)), "infEdgeBYs"_a = to_pyarray(move(infEdgeBYs)),
+			"doubleInfEdgeAXs"_a = to_pyarray(move(doubleInfEdgeAXs)), "doubleInfEdgeAYs"_a = to_pyarray(move(doubleInfEdgeAYs)),
+			"doubleInfEdgeBXs"_a = to_pyarray(move(doubleInfEdgeBXs)), "doubleInfEdgeBYs"_a = to_pyarray(move(doubleInfEdgeBYs)),
+			"delaunayEdgeAs"_a = to_pyarray(move(delaunayEdgeAs)), "delaunayEdgeBs"_a = to_pyarray(move(delaunayEdgeBs)),
+			"pointXs"_a = to_pyarray(move(pointXs)), "pointYs"_a = to_pyarray(move(pointYs))
 		};
 
 		py::exec(R"(
 			import numpy as np
 			import matplotlib.pyplot as plt
 
-			vertexXs = np.array(vertexXs)
-			vertexYs = np.array(vertexYs)
-
 			edges = np.zeros((2, len(edgeAs)), dtype = np.uint64)
-			edges[0, :] = np.array(edgeAs)
-			edges[1, :] = np.array(edgeBs)
+			edges[0, :] = edgeAs
+			edges[1, :] = edgeBs
 
 			infEdgeXs = np.zeros((2, len(infEdgeAs)))
 			infEdgeXs[0, :] = vertexXs[infEdgeAs]
-			infEdgeXs[1, :] = np.array(infEdgeBXs)
+			infEdgeXs[1, :] = infEdgeBXs
 			infEdgeYs = np.zeros((2, len(infEdgeAs)))
 			infEdgeYs[0, :] = vertexYs[infEdgeAs]
-			infEdgeYs[1, :] = np.array(infEdgeBYs)
+			infEdgeYs[1, :] = infEdgeBYs
 
 			doubleInfEdgeXs = np.zeros((2, len(doubleInfEdgeAXs)))
-			doubleInfEdgeXs[0, :] = np.array(doubleInfEdgeAXs)
-			doubleInfEdgeXs[1, :] = np.array(doubleInfEdgeBXs)
+			doubleInfEdgeXs[0, :] = doubleInfEdgeAXs
+			doubleInfEdgeXs[1, :] = doubleInfEdgeBXs
 			doubleInfEdgeYs = np.zeros((2, len(doubleInfEdgeAYs)))
-			doubleInfEdgeYs[0, :] = np.array(doubleInfEdgeAYs)
-			doubleInfEdgeYs[1, :] = np.array(doubleInfEdgeBYs)
+			doubleInfEdgeYs[0, :] = doubleInfEdgeAYs
+			doubleInfEdgeYs[1, :] = doubleInfEdgeBYs
 
 			delaunayEdges = np.zeros((2, len(delaunayEdgeAs)), dtype = np.uint64)
-			delaunayEdges[0, :] = np.array(delaunayEdgeAs)
-			delaunayEdges[1, :] = np.array(delaunayEdgeBs)
+			delaunayEdges[0, :] = delaunayEdgeAs
+			delaunayEdges[1, :] = delaunayEdgeBs
 
-			pointXs = np.array(pointXs)
-			pointYs = np.array(pointYs)
+			pointXs = pointXs
+			pointYs = pointYs
 			
 			fig = plt.figure()
 			ax = fig.add_subplot(111)
