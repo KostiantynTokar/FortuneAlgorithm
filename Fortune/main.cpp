@@ -947,7 +947,7 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 			// then put body of setNextAndPrev in if block, copy it to else block with swapping next and prev in lhs.
 			assert((points[bads].x - points[s1].x) * (points[s2].y - points[s1].y) - (points[bads].y - points[s1].y) * (points[s2].x - points[s1].x) < 0);
 
-			const auto setNextAndPrev = [&edges = dcel.edges](const ptrdiff_t centralEdgepq, const ptrdiff_t leftEdgepq, const ptrdiff_t rightEdgepq, const size_t sLeft, const size_t sRight)
+			const auto setNextAndFace = [&edges = dcel.edges](const ptrdiff_t centralEdgepq, const ptrdiff_t leftEdgepq, const ptrdiff_t rightEdgepq, const size_t sLeft, const size_t sRight)
 			{
 				if (edges[centralEdgepq].face == sLeft)
 				{
@@ -961,9 +961,9 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 				}
 			};
 
-			setNextAndPrev(intersectionEdgepq, leftIntersectionEdgepq, rightIntersectionEdgepq, s1, s2);
-			setNextAndPrev(leftIntersectionEdgepq, rightIntersectionEdgepq, intersectionEdgepq, bads, s1);
-			setNextAndPrev(rightIntersectionEdgepq, intersectionEdgepq, leftIntersectionEdgepq, s2, bads);
+			setNextAndFace(intersectionEdgepq, leftIntersectionEdgepq, rightIntersectionEdgepq, s1, s2);
+			setNextAndFace(leftIntersectionEdgepq, rightIntersectionEdgepq, intersectionEdgepq, bads, s1);
+			setNextAndFace(rightIntersectionEdgepq, intersectionEdgepq, leftIntersectionEdgepq, s2, bads);
 
 			createCircleEvents(ev.y, left, intersection, right, left, intersection, right);
 		}
