@@ -172,20 +172,20 @@ struct BeachLine
 	};
 
 	Node* root;
-	const std::vector<Point>& points;
+	const std::vector<Point>& sites;
 
-	constexpr BeachLine(const std::vector<Point>& points, std::vector<size_t> pointsWithTheBiggestY, DoublyConnectedEdgeList& dcel)
-		: points{ points }
+	constexpr BeachLine(const std::vector<Point>& sites, std::vector<size_t> sitesWithTheBiggestY, DoublyConnectedEdgeList& dcel)
+		: sites{ sites }
 		, root{ nullptr }
 	{
-		assert(pointsWithTheBiggestY.size() >= 1);
+		assert(sitesWithTheBiggestY.size() >= 1);
 		std::sort(
-			std::begin(pointsWithTheBiggestY), std::end(pointsWithTheBiggestY),
-			[&points](const size_t lhs, const size_t rhs)
+			std::begin(sitesWithTheBiggestY), std::end(sitesWithTheBiggestY),
+			[&sites](const size_t lhs, const size_t rhs)
 			{
-				return points[lhs].x < points[rhs].x;
+				return sites[lhs].x < sites[rhs].x;
 			});
-		root = init(std::cbegin(pointsWithTheBiggestY), std::cend(pointsWithTheBiggestY), dcel);
+		root = init(std::cbegin(sitesWithTheBiggestY), std::cend(sitesWithTheBiggestY), dcel);
 	}
 
 	~BeachLine()
@@ -222,7 +222,7 @@ struct BeachLine
 
 	constexpr Node* findRegion(const size_t site) const
 	{
-		return findRegionFrom(root, site, points[site].y);
+		return findRegionFrom(root, site, sites[site].y);
 	}
 
 	constexpr Node* findRegionFrom(Node* node, const size_t site, const double sweepLinePos) const
@@ -231,12 +231,12 @@ struct BeachLine
 		if (node->isLeaf())
 			return node;
 
-		const auto intersectionX = get<0>(parabolasIntersectionX(sweepLinePos, points[node->p], points[node->q]));
+		const auto intersectionX = get<0>(parabolasIntersectionX(sweepLinePos, sites[node->p], sites[node->q]));
 
 		// If intersection's x-coordinate equals to site's x-coordinate, then new circle event will be created and instantly processed
 		// (piece of left arc with is created and removed instantly).
 		// Then the same will happen to the right arc of this intersection.
-		const auto nextNode = points[site].x <= intersectionX ? node->left : node->right;
+		const auto nextNode = sites[site].x <= intersectionX ? node->left : node->right;
 		return findRegionFrom(nextNode, site, sweepLinePos);
 	}
 
@@ -586,20 +586,20 @@ struct PriorityQueue
 	size_t newId;
 	vector<size_t> idToInd;
 
-	constexpr PriorityQueue(const vector<Point>& points)
-		: storage{ new Event[points.size() * 2] }
-		, ids{ new size_t[points.size() * 2] }
-		, size{ points.size() }
-		, newId{ points.size() }
+	constexpr PriorityQueue(const vector<Point>& sites)
+		: storage{ new Event[sites.size() * 2] }
+		, ids{ new size_t[sites.size() * 2] }
+		, size{ sites.size() }
+		, newId{ sites.size() }
 	{
-		idToInd.reserve(points.size());
-		for (size_t i{ 0 }; i != points.size(); ++i)
+		idToInd.reserve(sites.size());
+		for (size_t i{ 0 }; i != sites.size(); ++i)
 		{
-			storage[i] = Event{ .y = points[i].y, .type = Event::Type::site };
+			storage[i] = Event{ .y = sites[i].y, .type = Event::Type::site };
 			ids[i] = i;
 			idToInd.push_back(i);
 		}
-		for (size_t i{ points.size() / 2 + 1 }; i != 0; --i)
+		for (size_t i{ sites.size() / 2 + 1 }; i != 0; --i)
 		{
 			downHeapify(i - 1);
 		}
@@ -739,49 +739,49 @@ bool isConvergent(const double y, const Point& siteLeft, const Point& siteCenter
 	return definitelyLessThan((siteCenter.x - siteLeft.x) * (siteRight.y - siteLeft.y) - (siteCenter.y - siteLeft.y) * (siteRight.x - siteLeft.x), 0);
 }
 
-DoublyConnectedEdgeList fortune(const vector<Point>& points)
+DoublyConnectedEdgeList fortune(const vector<Point>& sites)
 {
 	auto dcel = DoublyConnectedEdgeList{};
 
-	dcel.faces.resize(points.size());
+	dcel.faces.resize(sites.size());
 
-	auto queue = PriorityQueue{ points };
+	auto queue = PriorityQueue{ sites };
 
 	if (queue.empty())
 	{
 		return dcel;
 	}
 
-	auto pointsWithTheBiggestY = vector<size_t>{};
+	auto sitesWithTheBiggestY = vector<size_t>{};
 	do
 	{
-		pointsWithTheBiggestY.push_back(get<1>(queue.pop()));
-	} while (!queue.empty() && isClose(queue.storage[0].y, points[pointsWithTheBiggestY.back()].y));
+		sitesWithTheBiggestY.push_back(get<1>(queue.pop()));
+	} while (!queue.empty() && isClose(queue.storage[0].y, sites[sitesWithTheBiggestY.back()].y));
 	
-	auto beachLine = BeachLine{ points, std::move(pointsWithTheBiggestY), dcel };
+	auto beachLine = BeachLine{ sites, std::move(sitesWithTheBiggestY), dcel };
 
-	const auto createCircleEvents = [&points, &queue, &beachLine]
+	const auto createCircleEvents = [&sites, &queue, &beachLine]
 	(const double y,
 		BeachLine::Node* left, BeachLine::Node* leftIntersection, BeachLine::Node* innerLeft,
 		BeachLine::Node* innerRight, BeachLine::Node* rightIntersection, BeachLine::Node* right)
 	{
 		if(const auto leftleftIntersection = get<0>(beachLine.findIntersectionWithLeftLeaf(left)))
 		{
-			if(isConvergent(y, points[leftleftIntersection->p], points[leftleftIntersection->q], points[innerLeft->p]))
+			if(isConvergent(y, sites[leftleftIntersection->p], sites[leftleftIntersection->q], sites[innerLeft->p]))
 			{
 				const auto leftleftSite = leftleftIntersection->p;
 				assert(leftleftSite != left->p && leftleftSite != innerLeft->p && left->p != innerLeft->p);
-				const auto [bottom, center] = circleBottomPoint(points[leftleftSite], points[left->p], points[innerLeft->p]);
+				const auto [bottom, center] = circleBottomPoint(sites[leftleftSite], sites[left->p], sites[innerLeft->p]);
 				left->circleEventId = queue.insertCircleEvent(bottom, center, left);
 			}
 		}
 		if (const auto rightrightIntersection = get<0>(beachLine.findIntersectionWithRightLeaf(right)))
 		{
-			if(isConvergent(y, points[innerRight->p], points[rightrightIntersection->p], points[rightrightIntersection->q]))
+			if(isConvergent(y, sites[innerRight->p], sites[rightrightIntersection->p], sites[rightrightIntersection->q]))
 			{
 				const auto rightrightSite = rightrightIntersection->q;
 				assert(rightrightSite != right->p && rightrightSite != innerRight->p && right->p != innerRight->p);
-				const auto [bottom, center] = circleBottomPoint(points[rightrightSite], points[right->p], points[innerRight->p]);
+				const auto [bottom, center] = circleBottomPoint(sites[rightrightSite], sites[right->p], sites[innerRight->p]);
 				right->circleEventId = queue.insertCircleEvent(bottom, center, right);
 			}
 		}
@@ -909,52 +909,52 @@ auto to_pyarray(Seq&& seq)
 
 int main()
 {
-	//const auto points = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6}, {-11, 11}, {-11, 7.5} };
-	//const auto points = vector<Point>{ {1, 2}, {0, 1}, {0, 0}, {0, -1}, {0, -2}, {0, -3}, {0, -4} };
-	//const auto points = vector<Point>{ {4, 0}, {0, 8}, {8, 2}, {7, 9} };
-	//const auto points = vector<Point>{ {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-10,-6}, {-11,7}, {-2,6}, {-11, 11} };
-	//const auto points = vector<Point>{ {-1, 1}, {1, 1}, {0, 0}, {3, 1} };
-	//const auto points = vector<Point>{ {0, 2}, {0, 1}, {0, 0}, {0, -1}, {0, -2} };
-	//const auto points = vector<Point>{ {-1, 1}, {1, 1}, {3, 1}, {0, 4}, {2, 4}, {-1, 7}, {1, 7}, {5, 7} };
-	//const auto points = vector<Point>{ {0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4}, {4, 0}, {4, 1}, {4, 2}, {4, 3}, {4, 4}, {1, 0}, {2, 0}, {3, 0}, {1, 4}, {2, 4}, {3, 4} };
-	//const auto points = vector<Point>{ {0, 2}, {2, 4}, {4, 2}, {2, 0}, {0, 1}, {1, 0} };
-	//const auto points = vector<Point>{ {0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4},
+	//const auto sites = vector<Point>{ {0, 10}, {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-5,-5}, {-10,-6}, {-9, 2}, {-11,7}, {-3, 0}, {-2,6}, {-11, 11}, {-11, 7.5} };
+	//const auto sites = vector<Point>{ {1, 2}, {0, 1}, {0, 0}, {0, -1}, {0, -2}, {0, -3}, {0, -4} };
+	//const auto sites = vector<Point>{ {4, 0}, {0, 8}, {8, 2}, {7, 9} };
+	//const auto sites = vector<Point>{ {1, 9}, {5, 8}, {3, 4}, {4, 5}, {1,-1}, {5,-2}, {-10,-6}, {-11,7}, {-2,6}, {-11, 11} };
+	//const auto sites = vector<Point>{ {-1, 1}, {1, 1}, {0, 0}, {3, 1} };
+	//const auto sites = vector<Point>{ {0, 2}, {0, 1}, {0, 0}, {0, -1}, {0, -2} };
+	//const auto sites = vector<Point>{ {-1, 1}, {1, 1}, {3, 1}, {0, 4}, {2, 4}, {-1, 7}, {1, 7}, {5, 7} };
+	//const auto sites = vector<Point>{ {0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4}, {4, 0}, {4, 1}, {4, 2}, {4, 3}, {4, 4}, {1, 0}, {2, 0}, {3, 0}, {1, 4}, {2, 4}, {3, 4} };
+	//const auto sites = vector<Point>{ {0, 2}, {2, 4}, {4, 2}, {2, 0}, {0, 1}, {1, 0} };
+	//const auto sites = vector<Point>{ {0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4},
 	// 									{4, 0}, {4, 1}, {4, 2}, {4, 3}, {4, 4},
 	// 									{1, 0}, {1, 1}, {1, 2}, {1, 3}, {1, 4},
 	// 									{2, 0}, {2, 1}, {2, 2}, {2, 3}, {2, 4},
 	// 									{3, 0}, {3, 1}, {3, 2}, {3, 3}, {3, 4}
 	//};
-	//const auto points = vector<Point>{ {0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4},
+	//const auto sites = vector<Point>{ {0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4},
 	//									{4, 0}, {4, 1}, {4, 2}, {4, 3}, {4, 4},
 	//									{1, 0}, {1, 1}, {1, 2}, {1, 3}, {1, 4},
 	//									{3, 0}, {3, 1}, {3, 2}, {3, 3}, {3, 4}
 	//};
-	auto points = vector<Point>{ {0, 0} };
-	const auto pointsNumber = 20;
-	for (int i{ 0 }; i != pointsNumber; ++i)
+	auto sites = vector<Point>{ {0, 0} };
+	const auto sitesNumber = 20;
+	for (int i{ 0 }; i != sitesNumber; ++i)
 	{
-		points.push_back({ cos(2.0 * i * std::numbers::pi / pointsNumber), sin(2.0 * i * std::numbers::pi / pointsNumber) });
-		points.push_back({ 4.0 * cos(2.0 * i * std::numbers::pi / pointsNumber), 3.0 * sin(2.0 * i * std::numbers::pi / pointsNumber) });
-		points.push_back({ 5.0 * cos(2.0 * i * std::numbers::pi / pointsNumber), 7.0 * sin(2.0 * i * std::numbers::pi / pointsNumber) });
+		sites.push_back({ cos(2.0 * i * std::numbers::pi / sitesNumber), sin(2.0 * i * std::numbers::pi / sitesNumber) });
+		sites.push_back({ 4.0 * cos(2.0 * i * std::numbers::pi / sitesNumber), 3.0 * sin(2.0 * i * std::numbers::pi / sitesNumber) });
+		sites.push_back({ 5.0 * cos(2.0 * i * std::numbers::pi / sitesNumber), 7.0 * sin(2.0 * i * std::numbers::pi / sitesNumber) });
 	}
-	const auto vor = fortune(points);
+	const auto vor = fortune(sites);
 	const auto minMaxXY = [](const tuple<double, double, double, double>& accum, const Point& p)
 	{
 		return make_tuple(min(get<0>(accum), p.x), max(get<1>(accum), p.x), min(get<2>(accum), p.y), max(get<3>(accum), p.y));
 	};
-	const auto pointsMinMax = points.size() == 0
+	const auto sitesMinMax = sites.size() == 0
 		? make_tuple(0.0, 0.0, 0.0, 0.0)
 		: reduce(
-			cbegin(points), cend(points),
+			cbegin(sites), cend(sites),
 			make_tuple(numeric_limits<double>::max(), numeric_limits<double>::min(), numeric_limits<double>::max(), numeric_limits<double>::min()),
 			minMaxXY
 		);
 	constexpr auto extendDrawRegionForAllVertices = true;
 	const auto [minX, maxX, minY, maxY] = !extendDrawRegionForAllVertices
-		? pointsMinMax
+		? sitesMinMax
 		: transform_reduce(
 			cbegin(vor.vertices), cend(vor.vertices),
-			pointsMinMax,
+			sitesMinMax,
 			minMaxXY,
 			[](const auto& vertex) { return vertex.p; }
 		);
@@ -1023,9 +1023,9 @@ int main()
 			const auto s2 = e2.face;
 			assert(s1 != s2);
 			// a * y + b * x + c = 0
-			const auto a = points[s2].y - points[s1].y;
-			const auto b = points[s2].x - points[s1].x;
-			const auto c = -b * (points[s1].x + points[s2].x) / 2 - a * (points[s1].y + points[s2].y) / 2;
+			const auto a = sites[s2].y - sites[s1].y;
+			const auto b = sites[s2].x - sites[s1].x;
+			const auto c = -b * (sites[s1].x + sites[s2].x) / 2 - a * (sites[s1].y + sites[s2].y) / 2;
 
 			if (e1.vertexFrom != -1 || e2.vertexFrom != -1)
 			{
@@ -1044,13 +1044,13 @@ int main()
 				if (isCloseToZero(a))
 				{
 					infEdgeXs[infEdgeCounter + infEdgeCount] = -c / b;
-					infEdgeYs[infEdgeCounter + infEdgeCount] = points[bads].y < points[s1].y ? drawMaxY : drawMinY;
+					infEdgeYs[infEdgeCounter + infEdgeCount] = sites[bads].y < sites[s1].y ? drawMaxY : drawMinY;
 				}
 				else
 				{
-					const auto isDirLeft = isClose(points[s1].x, points[s2].x)
-						? points[s1].x < points[bads].x
-						: [a, b, &s1 = points[s1], &bads = points[bads]]()
+					const auto isDirLeft = isClose(sites[s1].x, sites[s2].x)
+						? sites[s1].x < sites[bads].x
+						: [a, b, &s1 = sites[s1], &bads = sites[bads]]()
 					{
 						const auto perpA = -b;
 						const auto perpB = a;
@@ -1097,12 +1097,12 @@ int main()
 		delaunayEdges[(i + vor.edges.size()) / 2] = vor.edges[i + 1].face;
 	}
 
-	vector<double> pointXs;
-	vector<double> pointYs;
-	for(const auto& p : points)
+	vector<double> siteXs;
+	vector<double> siteYs;
+	for(const auto& p : sites)
 	{
-		pointXs.push_back(p.x);
-		pointYs.push_back(p.y);
+		siteXs.push_back(p.x);
+		siteYs.push_back(p.y);
 	}
 
 	try
@@ -1112,8 +1112,8 @@ int main()
 		const auto np = py::module_::import("numpy");
 		const auto plt = py::module_::import("matplotlib.pyplot");
 
-		const auto pyPointsXs = to_pyarray(move(pointXs));
-		const auto pyPointsYs = to_pyarray(move(pointYs));
+		const auto pySitesXs = to_pyarray(move(siteXs));
+		const auto pySitesYs = to_pyarray(move(siteYs));
 		const auto pyVertexXs = to_pyarray(move(vertexXs));
 		const auto pyVertexYs = to_pyarray(move(vertexYs));
 		const auto pyEdges = to_pyarray(move(edges), vector<size_t>{2, edgeCount});
@@ -1122,12 +1122,12 @@ int main()
 		const auto fig = plt.attr("figure")();
 		const auto ax = fig.attr("add_subplot")(111);
 
-		ax.attr("scatter")(pyPointsXs, pyPointsYs, "c"_a = "r");
+		ax.attr("scatter")(pySitesXs, pySitesYs, "c"_a = "r");
 		ax.attr("scatter")(pyVertexXs, pyVertexYs, "c"_a = "b");
 		ax.attr("plot")(pyVertexXs[pyEdges], pyVertexYs[pyEdges], "y-");
 		ax.attr("plot")(to_pyarray(move(infEdgeXs), vector<size_t>{2, infEdgeCount}), to_pyarray(move(infEdgeYs), vector<size_t>{2, infEdgeCount}), "y-");
 		ax.attr("plot")(to_pyarray(move(doubleInfEdgeXs), vector<size_t>{2, doubleInfEdgeCount}), to_pyarray(move(doubleInfEdgeYs), vector<size_t>{2, doubleInfEdgeCount}), "y-");
-		ax.attr("plot")(pyPointsXs[pyDelaunayEdges], pyPointsYs[pyDelaunayEdges], "r-");
+		ax.attr("plot")(pySitesXs[pyDelaunayEdges], pySitesYs[pyDelaunayEdges], "r-");
 		ax.attr("set_aspect")(1);
 		plt.attr("xlim")(drawMinX, drawMaxX);
 		plt.attr("ylim")(drawMinY, drawMaxY);
