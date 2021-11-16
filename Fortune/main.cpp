@@ -81,6 +81,14 @@ struct DoublyConnectedEdgeList
 	vector<Face> faces;
 };
 
+void addEdge(DoublyConnectedEdgeList& dcel, const size_t s1, const size_t s2)
+{
+	dcel.edges.push_back({ .face = s1 });
+	dcel.edges.push_back({ .face = s2 });
+	dcel.faces[s1] = { .edge = dcel.edges.size() - 2 };
+	dcel.faces[s2] = { .edge = dcel.edges.size() - 1 };
+}
+
 enum class ParabolasIntersectionDirection
 {
 	left,
@@ -207,10 +215,7 @@ struct BeachLine
 		};
 		n->left->parent = n;
 		n->right->parent = n;
-		dcel.edges.push_back({ .face = s1 });
-		dcel.edges.push_back({ .face = s2 });
-		dcel.faces[s1] = { .edge = dcel.edges.size() - 2 };
-		dcel.faces[s2] = { .edge = dcel.edges.size() - 1 };
+		addEdge(dcel, s1, s2);
 		return n;
 	}
 
@@ -797,10 +802,7 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 			assert(left->p == right->p);
 			assert(left->p == leftCentral->p && central->p == leftCentral->q);
 			assert(central->p == centralRight->p && right->p == centralRight->q);
-			dcel.edges.push_back({ .face = central->p });
-			dcel.edges.push_back({ .face = left->p });
-			dcel.faces[central->p] = { .edge = dcel.edges.size() - 2 };
-			dcel.faces[left->p] = { .edge = dcel.edges.size() - 1 };
+			addEdge(dcel, central->p, left->p);
 			centralRight->edgepq = leftCentral->edgepq = dcel.edges.size() - 2;
 			createCircleEvents(ev.y, left, leftCentral, central, central, centralRight, right);
 		}
