@@ -1109,35 +1109,29 @@ int main()
 	{
 		py::scoped_interpreter interpreter_guard{};
 
-		py::dict locals{
-			"drawMinX"_a = drawMinX, "drawMaxX"_a = drawMaxX, "drawMinY"_a = drawMinY, "drawMaxY"_a = drawMaxY,
-			"vertexXs"_a = to_pyarray(move(vertexXs)), "vertexYs"_a = to_pyarray(move(vertexYs)),
-			"edges"_a = to_pyarray(move(edges), vector<size_t>{2, edgeCount}),
-			"infEdgeXs"_a = to_pyarray(move(infEdgeXs), vector<size_t>{2, infEdgeCount}), "infEdgeYs"_a = to_pyarray(move(infEdgeYs), vector<size_t>{2, infEdgeCount}),
-			"doubleInfEdgeXs"_a = to_pyarray(move(doubleInfEdgeXs), vector<size_t>{2, doubleInfEdgeCount}),
-			"doubleInfEdgeYs"_a = to_pyarray(move(doubleInfEdgeYs), vector<size_t>{2, doubleInfEdgeCount}),
-			"delaunayEdges"_a = to_pyarray(move(delaunayEdges), vector<size_t>{2, vor.edges.size() / 2}),
-			"pointXs"_a = to_pyarray(move(pointXs)), "pointYs"_a = to_pyarray(move(pointYs))
-		};
+		const auto np = py::module_::import("numpy");
+		const auto plt = py::module_::import("matplotlib.pyplot");
 
-		py::exec(R"(
-			import numpy as np
-			import matplotlib.pyplot as plt
-			
-			fig = plt.figure()
-			ax = fig.add_subplot(111)
-			ax.scatter(vertexXs, vertexYs, c = 'b')
-			ax.plot(vertexXs[edges], vertexYs[edges], 'y-')
-			ax.plot(infEdgeXs, infEdgeYs, 'y-')
-			ax.plot(doubleInfEdgeXs, doubleInfEdgeYs, 'y-')
-			ax.plot(pointXs[delaunayEdges], pointYs[delaunayEdges], 'r-')
-			ax.scatter(pointXs, pointYs, c = 'r')
-			ax.set_aspect(1)
-			plt.xlim([drawMinX, drawMaxX])
-			plt.ylim([drawMinY, drawMaxY])
-			plt.show()
-			)",
-			py::globals(), locals);
+		const auto pyPointsXs = to_pyarray(move(pointXs));
+		const auto pyPointsYs = to_pyarray(move(pointYs));
+		const auto pyVertexXs = to_pyarray(move(vertexXs));
+		const auto pyVertexYs = to_pyarray(move(vertexYs));
+		const auto pyEdges = to_pyarray(move(edges), vector<size_t>{2, edgeCount});
+		const auto pyDelaunayEdges = to_pyarray(move(delaunayEdges), vector<size_t>{2, vor.edges.size() / 2});
+
+		const auto fig = plt.attr("figure")();
+		const auto ax = fig.attr("add_subplot")(111);
+
+		ax.attr("scatter")(pyPointsXs, pyPointsYs, "c"_a = "r");
+		ax.attr("scatter")(pyVertexXs, pyVertexYs, "c"_a = "b");
+		ax.attr("plot")(pyVertexXs[pyEdges], pyVertexYs[pyEdges], "y-");
+		ax.attr("plot")(to_pyarray(move(infEdgeXs), vector<size_t>{2, infEdgeCount}), to_pyarray(move(infEdgeYs), vector<size_t>{2, infEdgeCount}), "y-");
+		ax.attr("plot")(to_pyarray(move(doubleInfEdgeXs), vector<size_t>{2, doubleInfEdgeCount}), to_pyarray(move(doubleInfEdgeYs), vector<size_t>{2, doubleInfEdgeCount}), "y-");
+		ax.attr("plot")(pyPointsXs[pyDelaunayEdges], pyPointsYs[pyDelaunayEdges], "r-");
+		ax.attr("set_aspect")(1);
+		plt.attr("xlim")(drawMinX, drawMaxX);
+		plt.attr("ylim")(drawMinY, drawMaxY);
+		plt.attr("show")();
 	}
 	catch (std::exception e)
 	{
