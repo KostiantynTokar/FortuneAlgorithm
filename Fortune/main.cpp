@@ -729,86 +729,8 @@ tuple<double, Point> circleBottomPoint(const Point& a, const Point& b, const Poi
 
 bool isConvergent(const double y, const Point& siteLeft, const Point& siteCenter, const Point& siteRight)
 {
-	const auto [leftIntersectionX, leftIntersectionDir] = parabolasIntersectionX(y, siteLeft, siteCenter);
-	const auto [rightIntersectionX, rightIntersectionDir] = parabolasIntersectionX(y, siteCenter, siteRight);
-
-	// This 2 ifs handle rounding errors.
-	if (isClose(leftIntersectionX, rightIntersectionX) && definitelyLessThan(y, siteCenter.y))
-	{
-		return true;
-	}
-	if (isClose(leftIntersectionX, rightIntersectionX) && siteCenter.y < siteLeft.y && siteCenter.y < siteRight.y)
-	{
-		// If arc has 0 width (just appears) and is growing.
-		return false;
-	}
-
-	if (leftIntersectionDir == ParabolasIntersectionDirection::down && rightIntersectionDir == ParabolasIntersectionDirection::down)
-	{
-		return false;
-	}
-
-	// a * y + b * x + c = 0
-	const auto a1 = (siteCenter.y - siteLeft.y);
-	const auto b1 = (siteCenter.x - siteLeft.x);
-	const auto c1 = -b1 * (siteLeft.x + siteCenter.x) / 2 - a1 * (siteLeft.y + siteCenter.y) / 2;
-
-	const auto a2 = (siteRight.y - siteCenter.y);
-	const auto b2 = (siteRight.x - siteCenter.x);
-	const auto c2 = -b2 * (siteCenter.x + siteRight.x) / 2 - a2 * (siteCenter.y + siteRight.y) / 2;
-
-	assert(!isCloseToZero(a1) || !isCloseToZero(a2));
-
-	const auto denom = a2 * b1 - a1 * b2;
-	if (isCloseToZero(denom))
-	{
-		// Lines are parallel, there is no intersection.
-		return false;
-	}
-	const auto intersectionX = (a1 * c2 - a2 * c1) / denom;
-
-	switch (leftIntersectionDir)
-	{
-		break; case ParabolasIntersectionDirection::left:
-		{
-			if (definitelyLessThan(leftIntersectionX, intersectionX))
-				return false;
-		}
-		break; case ParabolasIntersectionDirection::right:
-		{
-			if (definitelyGreaterThan(leftIntersectionX, intersectionX))
-				return false;
-		}
-		break; case ParabolasIntersectionDirection::down:
-		{
-			if (!isClose(leftIntersectionX, intersectionX))
-				return false;
-		}
-	}
-
-	switch (rightIntersectionDir)
-	{
-		break; case ParabolasIntersectionDirection::left:
-		{
-			if (definitelyGreaterThan(intersectionX, rightIntersectionX))
-				return false;
-		}
-		break; case ParabolasIntersectionDirection::right:
-		{
-			if (definitelyLessThan(intersectionX, rightIntersectionX))
-				return false;
-		}
-		break; case ParabolasIntersectionDirection::down:
-		{
-			if (!isClose(rightIntersectionX, intersectionX))
-				return false;
-		}
-	}
-
-	// TODO: if this assert is false, then return false in this case.
-	assert(isClose(y, get<0>(circleBottomPoint(siteLeft, siteCenter, siteRight))) || y > get<0>(circleBottomPoint(siteLeft, siteCenter, siteRight)));
-
-	return true;
+	// True if triangle if left-oriented.
+	return definitelyLessThan((siteCenter.x - siteLeft.x) * (siteRight.y - siteLeft.y) - (siteCenter.y - siteLeft.y) * (siteRight.x - siteLeft.x), 0);
 }
 
 DoublyConnectedEdgeList fortune(const vector<Point>& points)
@@ -841,7 +763,6 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 		{
 			if(isConvergent(y, points[leftleftIntersection->p], points[leftleftIntersection->q], points[innerLeft->p]))
 			{
-				//const auto leftleftSite = leftleftIntersection->p == left->p ? leftleftIntersection->q : leftleftIntersection->p;
 				const auto leftleftSite = leftleftIntersection->p;
 				assert(leftleftSite != left->p && leftleftSite != innerLeft->p && left->p != innerLeft->p);
 				const auto [bottom, center] = circleBottomPoint(points[leftleftSite], points[left->p], points[innerLeft->p]);
@@ -852,7 +773,6 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 		{
 			if(isConvergent(y, points[innerRight->p], points[rightrightIntersection->p], points[rightrightIntersection->q]))
 			{
-				//const auto rightrightSite = rightrightIntersection->p == right->p ? rightrightIntersection->q : rightrightIntersection->p;
 				const auto rightrightSite = rightrightIntersection->q;
 				assert(rightrightSite != right->p && rightrightSite != innerRight->p && right->p != innerRight->p);
 				const auto [bottom, center] = circleBottomPoint(points[rightrightSite], points[right->p], points[innerRight->p]);
@@ -942,10 +862,6 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 				.p = ev.center,
 				.edge = dcel.edges[intersectionEdgepq].face == s2 ? static_cast<size_t>(intersectionEdgepq) : static_cast<size_t>(intersectionEdgepq + 1)
 			});
-
-			// TODO: if this assertion about left orientation of a triangle (s1, bads, s2) is not true,
-			// then put body of setNextAndPrev in if block, copy it to else block with swapping next and prev in lhs.
-			assert((points[bads].x - points[s1].x) * (points[s2].y - points[s1].y) - (points[bads].y - points[s1].y) * (points[s2].x - points[s1].x) < 0);
 
 			const auto setNextAndFace = [&edges = dcel.edges](const ptrdiff_t centralEdgepq, const ptrdiff_t leftEdgepq, const ptrdiff_t rightEdgepq, const size_t sLeft, const size_t sRight)
 			{
