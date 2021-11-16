@@ -892,13 +892,19 @@ DoublyConnectedEdgeList fortune(const vector<Point>& points)
 	return dcel;
 }
 
-template<typename Seq>
-auto to_pyarray(Seq&& seq)
+template<typename Seq, typename DimSeq>
+auto to_pyarray(Seq&& seq, DimSeq&& dimSeq)
 {
 	using ValSeq = std::remove_reference_t<Seq>;
 	auto seq_ptr = new ValSeq(std::forward<Seq>(seq));
 	auto capsule = py::capsule(seq_ptr, [](void* p) { delete reinterpret_cast<ValSeq*>(p); });
-	return py::array(seq_ptr->size(), seq_ptr->data(), capsule);
+	return py::array(std::forward<DimSeq>(dimSeq), seq_ptr->data(), capsule);
+}
+template<typename Seq>
+auto to_pyarray(Seq&& seq)
+{
+	const auto dim = seq.size();
+	return to_pyarray(std::forward<Seq>(seq), std::vector<size_t>{dim});
 }
 
 int main()
@@ -970,25 +976,48 @@ int main()
 		vertexYs.push_back(p.p.y);
 	}
 
-	vector<size_t> edgeAs;
-	vector<size_t> edgeBs;
-	vector<size_t> infEdgeAs;
-	vector<double> infEdgeBXs;
-	vector<double> infEdgeBYs;
-	vector<double> doubleInfEdgeAXs;
-	vector<double> doubleInfEdgeAYs;
-	vector<double> doubleInfEdgeBXs;
-	vector<double> doubleInfEdgeBYs;
+	// First half of the vectors represents first endpoints of a line segment, second half - second endpoints.
+	vector<size_t> edges;
+	vector<double> infEdgeXs;
+	vector<double> infEdgeYs;
+	vector<double> doubleInfEdgeXs;
+	vector<double> doubleInfEdgeYs;
+
+	size_t edgeCount = 0;
+	size_t infEdgeCount = 0;
+	size_t doubleInfEdgeCount = 0;
+	for (size_t i{ 0 }; i < vor.edges.size(); i += 2)
+	{
+		const auto& e1 = vor.edges[i];
+		const auto& e2 = vor.edges[i + 1];
+		if (e1.vertexFrom != -1 && e2.vertexFrom != -1)
+			++edgeCount;
+		else if (e1.vertexFrom != -1 || e2.vertexFrom != -1)
+			++infEdgeCount;
+		else
+			++doubleInfEdgeCount;
+	}
+
+	edges.resize(edgeCount * 2);
+	infEdgeXs.resize(infEdgeCount * 2);
+	infEdgeYs.resize(infEdgeCount * 2);
+	doubleInfEdgeXs.resize(doubleInfEdgeCount * 2);
+	doubleInfEdgeYs.resize(doubleInfEdgeCount * 2);
+
+	size_t edgeCounter = 0;
+	size_t infEdgeCounter = 0;
+	size_t doubleInfEdgeCounter = 0;
 	for (size_t i{ 0 }; i < vor.edges.size(); i += 2)
 	{
 		const auto& e1 = vor.edges[i];
 		const auto& e2 = vor.edges[i + 1];
 		if (e1.vertexFrom != -1 && e2.vertexFrom != -1)
 		{
-			edgeAs.push_back(e1.vertexFrom);
-			edgeBs.push_back(e2.vertexFrom);
+			edges[edgeCounter] = e1.vertexFrom;
+			edges[edgeCounter + edgeCount] = e2.vertexFrom;
+			++edgeCounter;
 		}
-		else // Infinite of half-infinite edge.
+		else // Infinite or half-infinite edge.
 		{
 			const auto s1 = e1.face;
 			const auto s2 = e2.face;
@@ -1009,12 +1038,13 @@ int main()
 				const auto bads = vor.edges[ePrevTwinInd].face;
 				assert(s1 != bads && s2 != bads);
 
-				infEdgeAs.push_back(e.vertexFrom);
+				infEdgeXs[infEdgeCounter] = vor.vertices[e.vertexFrom].p.x;
+				infEdgeYs[infEdgeCounter] = vor.vertices[e.vertexFrom].p.y;
 
 				if (isCloseToZero(a))
 				{
-					infEdgeBXs.push_back(-c / b);
-					infEdgeBYs.push_back(points[bads].y < points[s1].y ? drawMaxY : drawMinY);
+					infEdgeXs[infEdgeCounter + infEdgeCount] = -c / b;
+					infEdgeYs[infEdgeCounter + infEdgeCount] = points[bads].y < points[s1].y ? drawMaxY : drawMinY;
 				}
 				else
 				{
@@ -1030,37 +1060,41 @@ int main()
 						return distToPointToRight * distToBads > 0;
 					}();
 
-					infEdgeBXs.push_back(isDirLeft ? drawMinX : drawMaxX);
-					infEdgeBYs.push_back(-(b * infEdgeBXs.back() + c) / a);
+					infEdgeXs[infEdgeCounter + infEdgeCount] = isDirLeft ? drawMinX : drawMaxX;
+					infEdgeYs[infEdgeCounter + infEdgeCount] = -(b * infEdgeXs[infEdgeCounter + infEdgeCount] + c) / a;
 				}
+
+				++infEdgeCounter;
 			}
 			else // Infinite edge.
 			{
 				if (isCloseToZero(a))
 				{
-					doubleInfEdgeAXs.push_back(-c / b);
-					doubleInfEdgeAYs.push_back(drawMinY);
-					doubleInfEdgeBXs.push_back(-c / b);
-					doubleInfEdgeBYs.push_back(drawMaxY);
+					doubleInfEdgeXs[doubleInfEdgeCounter] = -c / b;
+					doubleInfEdgeYs[doubleInfEdgeCounter] = drawMinY;
+					doubleInfEdgeXs[doubleInfEdgeCounter + doubleInfEdgeCount] = -c / b;
+					doubleInfEdgeYs[doubleInfEdgeCounter + doubleInfEdgeCount] = drawMaxY;
 				}
 				else
 				{
-					doubleInfEdgeAXs.push_back(drawMinX);
-					doubleInfEdgeAYs.push_back(-(b * drawMinX + c) / a);
-					doubleInfEdgeBXs.push_back(drawMaxX);
-					doubleInfEdgeBYs.push_back(-(b * drawMaxX + c) / a);
+					doubleInfEdgeXs[doubleInfEdgeCounter] = drawMinX;
+					doubleInfEdgeYs[doubleInfEdgeCounter] = -(b * drawMinX + c) / a;
+					doubleInfEdgeXs[doubleInfEdgeCounter + doubleInfEdgeCount] = drawMaxX;
+					doubleInfEdgeYs[doubleInfEdgeCounter + doubleInfEdgeCount] = -(b * drawMaxX + c) / a;
 				}
+
+				++doubleInfEdgeCounter;
 			}
 		}
 	}
 
-	vector<size_t> delaunayEdgeAs;
-	vector<size_t> delaunayEdgeBs;
+	vector<size_t> delaunayEdges;
+	delaunayEdges.resize(vor.edges.size());
 	for (size_t i{ 0 }; i != vor.edges.size(); i += 2)
 	{
 		// vor.edges[i + 1] is a twin edge of an vor.edges[i].
-		delaunayEdgeAs.push_back(vor.edges[i].face);
-		delaunayEdgeBs.push_back(vor.edges[i + 1].face);
+		delaunayEdges[i / 2] = vor.edges[i].face;
+		delaunayEdges[(i + vor.edges.size()) / 2] = vor.edges[i + 1].face;
 	}
 
 	vector<double> pointXs;
@@ -1078,42 +1112,17 @@ int main()
 		py::dict locals{
 			"drawMinX"_a = drawMinX, "drawMaxX"_a = drawMaxX, "drawMinY"_a = drawMinY, "drawMaxY"_a = drawMaxY,
 			"vertexXs"_a = to_pyarray(move(vertexXs)), "vertexYs"_a = to_pyarray(move(vertexYs)),
-			"edgeAs"_a = to_pyarray(move(edgeAs)), "edgeBs"_a = to_pyarray(move(edgeBs)),
-			"infEdgeAs"_a = to_pyarray(move(infEdgeAs)), "infEdgeBXs"_a = to_pyarray(move(infEdgeBXs)), "infEdgeBYs"_a = to_pyarray(move(infEdgeBYs)),
-			"doubleInfEdgeAXs"_a = to_pyarray(move(doubleInfEdgeAXs)), "doubleInfEdgeAYs"_a = to_pyarray(move(doubleInfEdgeAYs)),
-			"doubleInfEdgeBXs"_a = to_pyarray(move(doubleInfEdgeBXs)), "doubleInfEdgeBYs"_a = to_pyarray(move(doubleInfEdgeBYs)),
-			"delaunayEdgeAs"_a = to_pyarray(move(delaunayEdgeAs)), "delaunayEdgeBs"_a = to_pyarray(move(delaunayEdgeBs)),
+			"edges"_a = to_pyarray(move(edges), vector<size_t>{2, edgeCount}),
+			"infEdgeXs"_a = to_pyarray(move(infEdgeXs), vector<size_t>{2, infEdgeCount}), "infEdgeYs"_a = to_pyarray(move(infEdgeYs), vector<size_t>{2, infEdgeCount}),
+			"doubleInfEdgeXs"_a = to_pyarray(move(doubleInfEdgeXs), vector<size_t>{2, doubleInfEdgeCount}),
+			"doubleInfEdgeYs"_a = to_pyarray(move(doubleInfEdgeYs), vector<size_t>{2, doubleInfEdgeCount}),
+			"delaunayEdges"_a = to_pyarray(move(delaunayEdges), vector<size_t>{2, vor.edges.size() / 2}),
 			"pointXs"_a = to_pyarray(move(pointXs)), "pointYs"_a = to_pyarray(move(pointYs))
 		};
 
 		py::exec(R"(
 			import numpy as np
 			import matplotlib.pyplot as plt
-
-			edges = np.zeros((2, len(edgeAs)), dtype = np.uint64)
-			edges[0, :] = edgeAs
-			edges[1, :] = edgeBs
-
-			infEdgeXs = np.zeros((2, len(infEdgeAs)))
-			infEdgeXs[0, :] = vertexXs[infEdgeAs]
-			infEdgeXs[1, :] = infEdgeBXs
-			infEdgeYs = np.zeros((2, len(infEdgeAs)))
-			infEdgeYs[0, :] = vertexYs[infEdgeAs]
-			infEdgeYs[1, :] = infEdgeBYs
-
-			doubleInfEdgeXs = np.zeros((2, len(doubleInfEdgeAXs)))
-			doubleInfEdgeXs[0, :] = doubleInfEdgeAXs
-			doubleInfEdgeXs[1, :] = doubleInfEdgeBXs
-			doubleInfEdgeYs = np.zeros((2, len(doubleInfEdgeAYs)))
-			doubleInfEdgeYs[0, :] = doubleInfEdgeAYs
-			doubleInfEdgeYs[1, :] = doubleInfEdgeBYs
-
-			delaunayEdges = np.zeros((2, len(delaunayEdgeAs)), dtype = np.uint64)
-			delaunayEdges[0, :] = delaunayEdgeAs
-			delaunayEdges[1, :] = delaunayEdgeBs
-
-			pointXs = pointXs
-			pointYs = pointYs
 			
 			fig = plt.figure()
 			ax = fig.add_subplot(111)
