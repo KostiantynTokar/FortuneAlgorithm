@@ -50,17 +50,17 @@ struct DoublyConnectedEdgeList
 	struct Vertex
 	{
 		Point p;
-		size_t edge;
+		size_t edge; // Index of one of the edges that have this vertex as an endpoint.
 	};
 	struct Face
 	{
-		size_t edge;
+		size_t edge; // Index of one of the edges that surround this face.
 	};
 	struct Edge
 	{
 		ptrdiff_t vertexFrom = -1; // -1 for edges that starts from infinite.
 		
-		size_t face;
+		size_t face; // Index of a face to the left of this edge.
 
 		ptrdiff_t next = -1; // -1 if there is no next (infinite edge).
 
@@ -74,10 +74,10 @@ struct DoublyConnectedEdgeList
 
 void addEdge(DoublyConnectedEdgeList& dcel, const size_t s1, const size_t s2)
 {
+	dcel.faces[s1] = { .edge = dcel.edges.size() };
+	dcel.faces[s2] = { .edge = dcel.edges.size() + 1 };
 	dcel.edges.push_back({ .face = s1 });
 	dcel.edges.push_back({ .face = s2 });
-	dcel.faces[s1] = { .edge = dcel.edges.size() - 2 };
-	dcel.faces[s2] = { .edge = dcel.edges.size() - 1 };
 }
 
 // Returns x-coordinate of an intersection of the arc1 from the left and arc2 from the right.
@@ -115,9 +115,9 @@ struct BeachLine
 		Node* parent;
 		Node* left;
 		Node* right;
-		size_t p;
-		size_t q;
-		ptrdiff_t edgepq = -1;
+		size_t p; // For intersections: site that defines left arc. For leaves: site that defines the arc.
+		size_t q; // For intersections: site that defines right arc. 
+		ptrdiff_t edgeInd = -1; // For intersections: index of an edge that is built from this intersection.
 		ptrdiff_t circleEventId; // -1 if no circle event is connected to this leaf.
 		signed char balance; // Difference in height between right subtree and left subtree.
 
@@ -186,7 +186,7 @@ struct BeachLine
 			.left = init(begin, std::next(begin, mid), dcel),
 			.right = init(std::next(begin, mid), end, dcel),
 			.p = s1, .q = s2,
-			.edgepq = static_cast<ptrdiff_t>(dcel.edges.size()),
+			.edgeInd = static_cast<ptrdiff_t>(dcel.edges.size()),
 			.circleEventId = -1,
 			.balance = static_cast<signed char>(mid * 2 == dist ? 0 : 1)
 		};
@@ -238,7 +238,7 @@ struct BeachLine
 		newSubTree->left = regionNode;
 		newSubTree->left->parent = newSubTree;
 		newSubTree->left->circleEventId = -1;
-		newSubTree->left->edgepq = -1;
+		newSubTree->left->edgeInd = -1;
 		newSubTree->right = new Node{ .parent = newSubTree, .left = nullptr, .right = nullptr, .p = site, .q = intersectedArc, .circleEventId = -1, .balance = 0 };
 		const auto redLeaf = newSubTree->right; // Rebalance, then add to this node 2 children.
 
@@ -780,7 +780,7 @@ DoublyConnectedEdgeList fortune(const vector<Point>& sites)
 			assert(left->p == leftCentral->p && central->p == leftCentral->q);
 			assert(central->p == centralRight->p && right->p == centralRight->q);
 			addEdge(dcel, central->p, left->p);
-			centralRight->edgepq = leftCentral->edgepq = dcel.edges.size() - 2;
+			centralRight->edgeInd = leftCentral->edgeInd = dcel.edges.size() - 2;
 			createCircleEvents(ev.y, left, leftCentral, central, central, centralRight, right);
 		}
 		break; case Event::Type::circle:
@@ -805,31 +805,31 @@ DoublyConnectedEdgeList fortune(const vector<Point>& sites)
 				right->circleEventId = -1;
 			}
 
-			assert(leftIntersection->edgepq != -1);
-			assert(rightIntersection->edgepq != -1);
+			assert(leftIntersection->edgeInd != -1);
+			assert(rightIntersection->edgeInd != -1);
 
 			const auto bads = arcToRemove->p;
-			const auto leftIntersectionEdgepq = leftIntersection->edgepq;
-			const auto rightIntersectionEdgepq = rightIntersection->edgepq;
+			const auto leftIntersectionEdgepq = leftIntersection->edgeInd;
+			const auto rightIntersectionEdgepq = rightIntersection->edgeInd;
 			const auto intersection = beachLine.removeArc(arcToRemove);
 
 			const auto s1 = left->p;
 			const auto s2 = right->p;
 
+			const auto intersectionEdgepq = intersection->edgeInd = dcel.edges.size();
+
 			dcel.edges.push_back({ .face = s1 });
 			dcel.edges.push_back({ .face = s2 });
 
-			const auto intersectionEdgepq = intersection->edgepq = dcel.edges.size() - 2;
-
-			const auto setVertexFrom = [&dcel](const ptrdiff_t edgepq, const size_t s)
+			const auto setVertexFrom = [&dcel](const ptrdiff_t edgeInd, const size_t s)
 			{
-				if (dcel.edges[edgepq].face == s)
+				if (dcel.edges[edgeInd].face == s)
 				{
-					dcel.edges[edgepq].vertexFrom = dcel.vertices.size();
+					dcel.edges[edgeInd].vertexFrom = dcel.vertices.size();
 				}
 				else
 				{
-					dcel.edges[edgepq + 1].vertexFrom = dcel.vertices.size();
+					dcel.edges[edgeInd + 1].vertexFrom = dcel.vertices.size();
 				}
 			};
 			
@@ -839,26 +839,24 @@ DoublyConnectedEdgeList fortune(const vector<Point>& sites)
 
 			dcel.vertices.push_back({
 				.p = ev.center,
-				.edge = dcel.edges[intersectionEdgepq].face == s2 ? static_cast<size_t>(intersectionEdgepq) : static_cast<size_t>(intersectionEdgepq + 1)
+				.edge = static_cast<size_t>(intersectionEdgepq + 1)
 			});
 
-			const auto setNextAndFace = [&edges = dcel.edges](const ptrdiff_t centralEdgepq, const ptrdiff_t leftEdgepq, const ptrdiff_t rightEdgepq, const size_t sLeft, const size_t sRight)
+			const auto setNext = [&edges = dcel.edges](const ptrdiff_t centralEdgepq, const ptrdiff_t leftEdgepq, const ptrdiff_t rightEdgepq, const size_t sLeft, const size_t sRight)
 			{
 				if (edges[centralEdgepq].face == sLeft)
 				{
 					edges[centralEdgepq].next = edges[leftEdgepq].face == sLeft ? leftEdgepq : leftEdgepq + 1;
-					edges[rightEdgepq].face == sRight ? rightEdgepq : rightEdgepq + 1;
 				}
 				else
 				{
 					edges[centralEdgepq + 1].next = edges[leftEdgepq].face == sLeft ? leftEdgepq : leftEdgepq + 1;
-					edges[rightEdgepq].face == sRight ? rightEdgepq : rightEdgepq + 1;
 				}
 			};
 
-			setNextAndFace(intersectionEdgepq, leftIntersectionEdgepq, rightIntersectionEdgepq, s1, s2);
-			setNextAndFace(leftIntersectionEdgepq, rightIntersectionEdgepq, intersectionEdgepq, bads, s1);
-			setNextAndFace(rightIntersectionEdgepq, intersectionEdgepq, leftIntersectionEdgepq, s2, bads);
+			setNext(intersectionEdgepq, leftIntersectionEdgepq, rightIntersectionEdgepq, s1, s2);
+			setNext(leftIntersectionEdgepq, rightIntersectionEdgepq, intersectionEdgepq, bads, s1);
+			setNext(rightIntersectionEdgepq, intersectionEdgepq, leftIntersectionEdgepq, s2, bads);
 
 			createCircleEvents(ev.y, left, intersection, right, left, intersection, right);
 		}
