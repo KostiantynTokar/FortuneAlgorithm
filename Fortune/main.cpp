@@ -50,34 +50,34 @@ struct DoublyConnectedEdgeList
 	struct Vertex
 	{
 		Point p;
-		size_t edge; // Index of one of the edges that have this vertex as an endpoint.
+		size_t halfEdge; // Index of one of the half-edges that have this vertex as an endpoint.
 	};
 	struct Face
 	{
-		size_t edge; // Index of one of the edges that surround this face.
+		size_t halfEdge; // Index of one of the half-edges that surround this face.
 	};
-	struct Edge
+	struct HalfEdge
 	{
-		ptrdiff_t vertexFrom = -1; // -1 for edges that starts from infinite.
+		ptrdiff_t vertexFrom = -1; // -1 for half-edges that starts from infinite.
 		
 		size_t face; // Index of a face to the left of this edge.
 
-		ptrdiff_t next = -1; // -1 if there is no next (infinite edge).
+		ptrdiff_t next = -1; // -1 if there is no next (infinite half-edge).
 
-		// NOTE: twin edges located in sequence in edges array, i.e., edges[2 * i] and edges[2 * i + 1] are twins.
+		// NOTE: twin half-edges located in sequence in halfEdges array, i.e., halfEdges[2 * i] and halfEdges[2 * i + 1] are twins.
 		// NOTE: prev = twin->next->twin->next->twin
 	};
-	vector<Edge> edges; // For n >= 3 sites, up to 3 * n - 6 edges, so up to 6 * n - 12 half-edges.
+	vector<HalfEdge> halfEdges; // For n >= 3 sites, up to 3 * n - 6 edges, so up to 6 * n - 12 half-edges.
 	vector<Vertex> vertices; // For n >= 3 sites, up to 2 * n - 5 vertices.
 	vector<Face> faces;
 };
 
 void addEdge(DoublyConnectedEdgeList& dcel, const size_t s1, const size_t s2)
 {
-	dcel.faces[s1] = { .edge = dcel.edges.size() };
-	dcel.faces[s2] = { .edge = dcel.edges.size() + 1 };
-	dcel.edges.push_back({ .face = s1 });
-	dcel.edges.push_back({ .face = s2 });
+	dcel.faces[s1] = { .halfEdge = dcel.halfEdges.size() };
+	dcel.faces[s2] = { .halfEdge = dcel.halfEdges.size() + 1 };
+	dcel.halfEdges.push_back({ .face = s1 });
+	dcel.halfEdges.push_back({ .face = s2 });
 }
 
 // Returns x-coordinate of an intersection of the arc1 from the left and arc2 from the right.
@@ -117,8 +117,8 @@ struct BeachLine
 		Node* right;
 		size_t p; // For intersections: site that defines left arc. For leaves: site that defines the arc.
 		size_t q; // For intersections: site that defines right arc. 
-		ptrdiff_t edgeInd = -1; // For intersections: index of an edge that is built from this intersection.
-		ptrdiff_t circleEventId; // -1 if no circle event is connected to this leaf.
+		ptrdiff_t halfEdge = -1; // For intersections: index of an edge that is built from this intersection.
+		ptrdiff_t circleEventId; // -1 if no circle event that is connected to this leaf.
 		signed char balance; // Difference in height between right subtree and left subtree.
 
 		constexpr bool isLeaf() const
@@ -186,7 +186,7 @@ struct BeachLine
 			.left = init(begin, std::next(begin, mid), dcel),
 			.right = init(std::next(begin, mid), end, dcel),
 			.p = s1, .q = s2,
-			.edgeInd = static_cast<ptrdiff_t>(dcel.edges.size()),
+			.halfEdge = static_cast<ptrdiff_t>(dcel.halfEdges.size()),
 			.circleEventId = -1,
 			.balance = static_cast<signed char>(mid * 2 == dist ? 0 : 1)
 		};
@@ -237,8 +237,8 @@ struct BeachLine
 		auto newSubTree = new Node{ .parent = regionNodeParent, .left = nullptr, .right = nullptr, .p = intersectedArc, .q = site, .circleEventId = -1, .balance = 0 };
 		newSubTree->left = regionNode;
 		newSubTree->left->parent = newSubTree;
+		newSubTree->left->halfEdge = -1;
 		newSubTree->left->circleEventId = -1;
-		newSubTree->left->edgeInd = -1;
 		newSubTree->right = new Node{ .parent = newSubTree, .left = nullptr, .right = nullptr, .p = site, .q = intersectedArc, .circleEventId = -1, .balance = 0 };
 		const auto redLeaf = newSubTree->right; // Rebalance, then add to this node 2 children.
 
@@ -719,7 +719,7 @@ DoublyConnectedEdgeList fortune(const vector<Point>& sites)
 {
 	auto dcel = DoublyConnectedEdgeList{};
 
-	dcel.edges.reserve(sites.size() >= 3 ? 6 * sites.size() - 12 : (sites.size() == 2 ? 2 : 0));
+	dcel.halfEdges.reserve(sites.size() >= 3 ? 6 * sites.size() - 12 : (sites.size() == 2 ? 2 : 0));
 	dcel.vertices.reserve(sites.size() >= 3 ? 2 * sites.size() - 5 : 0);
 	dcel.faces.resize(sites.size());
 
@@ -781,8 +781,8 @@ DoublyConnectedEdgeList fortune(const vector<Point>& sites)
 			assert(left->p == right->p);
 			assert(left->p == leftCentral->p && central->p == leftCentral->q);
 			assert(central->p == centralRight->p && right->p == centralRight->q);
+			centralRight->halfEdge = leftCentral->halfEdge = dcel.halfEdges.size();
 			addEdge(dcel, central->p, left->p);
-			centralRight->edgeInd = leftCentral->edgeInd = dcel.edges.size() - 2;
 			createCircleEvents(ev.y, left, leftCentral, central, central, centralRight, right);
 		}
 		break; case Event::Type::circle:
@@ -807,31 +807,31 @@ DoublyConnectedEdgeList fortune(const vector<Point>& sites)
 				right->circleEventId = -1;
 			}
 
-			assert(leftIntersection->edgeInd != -1);
-			assert(rightIntersection->edgeInd != -1);
+			assert(leftIntersection->halfEdge != -1);
+			assert(rightIntersection->halfEdge != -1);
 
 			const auto bads = arcToRemove->p;
-			const auto leftIntersectionEdgepq = leftIntersection->edgeInd;
-			const auto rightIntersectionEdgepq = rightIntersection->edgeInd;
+			const auto leftIntersectionEdgepq = leftIntersection->halfEdge;
+			const auto rightIntersectionEdgepq = rightIntersection->halfEdge;
 			const auto intersection = beachLine.removeArc(arcToRemove);
 
 			const auto s1 = left->p;
 			const auto s2 = right->p;
 
-			const auto intersectionEdgepq = intersection->edgeInd = dcel.edges.size();
+			const auto intersectionEdgepq = intersection->halfEdge = dcel.halfEdges.size();
 
-			dcel.edges.push_back({ .face = s1 });
-			dcel.edges.push_back({ .face = s2 });
+			dcel.halfEdges.push_back({ .face = s1 });
+			dcel.halfEdges.push_back({ .face = s2 });
 
 			const auto setVertexFrom = [&dcel](const ptrdiff_t edgeInd, const size_t s)
 			{
-				if (dcel.edges[edgeInd].face == s)
+				if (dcel.halfEdges[edgeInd].face == s)
 				{
-					dcel.edges[edgeInd].vertexFrom = dcel.vertices.size();
+					dcel.halfEdges[edgeInd].vertexFrom = dcel.vertices.size();
 				}
 				else
 				{
-					dcel.edges[edgeInd + 1].vertexFrom = dcel.vertices.size();
+					dcel.halfEdges[edgeInd + 1].vertexFrom = dcel.vertices.size();
 				}
 			};
 			
@@ -841,18 +841,18 @@ DoublyConnectedEdgeList fortune(const vector<Point>& sites)
 
 			dcel.vertices.push_back({
 				.p = ev.center,
-				.edge = static_cast<size_t>(intersectionEdgepq + 1)
+				.halfEdge = static_cast<size_t>(intersectionEdgepq + 1)
 			});
 
-			const auto setNext = [&edges = dcel.edges](const ptrdiff_t centralEdgepq, const ptrdiff_t leftEdgepq, const ptrdiff_t rightEdgepq, const size_t sLeft, const size_t sRight)
+			const auto setNext = [&halfEdges = dcel.halfEdges](const ptrdiff_t centralEdgepq, const ptrdiff_t leftEdgepq, const ptrdiff_t rightEdgepq, const size_t sLeft, const size_t sRight)
 			{
-				if (edges[centralEdgepq].face == sLeft)
+				if (halfEdges[centralEdgepq].face == sLeft)
 				{
-					edges[centralEdgepq].next = edges[leftEdgepq].face == sLeft ? leftEdgepq : leftEdgepq + 1;
+					halfEdges[centralEdgepq].next = halfEdges[leftEdgepq].face == sLeft ? leftEdgepq : leftEdgepq + 1;
 				}
 				else
 				{
-					edges[centralEdgepq + 1].next = edges[leftEdgepq].face == sLeft ? leftEdgepq : leftEdgepq + 1;
+					halfEdges[centralEdgepq + 1].next = halfEdges[leftEdgepq].face == sLeft ? leftEdgepq : leftEdgepq + 1;
 				}
 			};
 
@@ -958,10 +958,10 @@ int main()
 	size_t edgeCount = 0;
 	size_t infEdgeCount = 0;
 	size_t doubleInfEdgeCount = 0;
-	for (size_t i{ 0 }; i < vor.edges.size(); i += 2)
+	for (size_t i{ 0 }; i < vor.halfEdges.size(); i += 2)
 	{
-		const auto& e1 = vor.edges[i];
-		const auto& e2 = vor.edges[i + 1];
+		const auto& e1 = vor.halfEdges[i];
+		const auto& e2 = vor.halfEdges[i + 1];
 		if (e1.vertexFrom != -1 && e2.vertexFrom != -1)
 			++edgeCount;
 		else if (e1.vertexFrom != -1 || e2.vertexFrom != -1)
@@ -979,10 +979,10 @@ int main()
 	size_t edgeCounter = 0;
 	size_t infEdgeCounter = 0;
 	size_t doubleInfEdgeCounter = 0;
-	for (size_t i{ 0 }; i < vor.edges.size(); i += 2)
+	for (size_t i{ 0 }; i < vor.halfEdges.size(); i += 2)
 	{
-		const auto& e1 = vor.edges[i];
-		const auto& e2 = vor.edges[i + 1];
+		const auto& e1 = vor.halfEdges[i];
+		const auto& e2 = vor.halfEdges[i + 1];
 		if (e1.vertexFrom != -1 && e2.vertexFrom != -1)
 		{
 			edges[edgeCounter] = e1.vertexFrom;
@@ -1003,11 +1003,11 @@ int main()
 			{
 				const auto& [e, eTwinInd] = e1.vertexFrom == -1 ? make_tuple(e2, i) : make_tuple(e1, i + 1);
 				// prev = twin->next->twin->next->twin
-				const auto eTwinNextInd = vor.edges[eTwinInd].next;
+				const auto eTwinNextInd = vor.halfEdges[eTwinInd].next;
 				const auto eTwinNextTwinInd = eTwinNextInd % 2 == 0 ? eTwinNextInd + 1 : eTwinNextInd - 1;
-				const auto ePrevTwinInd = vor.edges[eTwinNextTwinInd].next;
+				const auto ePrevTwinInd = vor.halfEdges[eTwinNextTwinInd].next;
 				// bads - site opposite to the ray, sOpposite.
-				const auto bads = vor.edges[ePrevTwinInd].face;
+				const auto bads = vor.halfEdges[ePrevTwinInd].face;
 				assert(s1 != bads && s2 != bads);
 
 				infEdgeXs[infEdgeCounter] = vor.vertices[e.vertexFrom].p.x;
@@ -1061,12 +1061,12 @@ int main()
 	}
 
 	vector<size_t> delaunayEdges;
-	delaunayEdges.resize(vor.edges.size());
-	for (size_t i{ 0 }; i != vor.edges.size(); i += 2)
+	delaunayEdges.resize(vor.halfEdges.size());
+	for (size_t i{ 0 }; i != vor.halfEdges.size(); i += 2)
 	{
 		// vor.edges[i + 1] is a twin edge of an vor.edges[i].
-		delaunayEdges[i / 2] = vor.edges[i].face;
-		delaunayEdges[(i + vor.edges.size()) / 2] = vor.edges[i + 1].face;
+		delaunayEdges[i / 2] = vor.halfEdges[i].face;
+		delaunayEdges[(i + vor.halfEdges.size()) / 2] = vor.halfEdges[i + 1].face;
 	}
 
 	vector<double> siteXs;
@@ -1089,7 +1089,7 @@ int main()
 		const auto pyVertexXs = to_pyarray(move(vertexXs));
 		const auto pyVertexYs = to_pyarray(move(vertexYs));
 		const auto pyEdges = to_pyarray(move(edges), vector<size_t>{2, edgeCount});
-		const auto pyDelaunayEdges = to_pyarray(move(delaunayEdges), vector<size_t>{2, vor.edges.size() / 2});
+		const auto pyDelaunayEdges = to_pyarray(move(delaunayEdges), vector<size_t>{2, vor.halfEdges.size() / 2});
 
 		const auto fig = plt.attr("figure")();
 		const auto ax = fig.attr("add_subplot")(111);
