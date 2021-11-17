@@ -67,8 +67,8 @@ struct DoublyConnectedEdgeList
 		// NOTE: twin edges located in sequence in edges array, i.e., edges[2 * i] and edges[2 * i + 1] are twins.
 		// NOTE: prev = twin->next->twin->next->twin
 	};
-	vector<Edge> edges; // up to n^2 elements?
-	vector<Vertex> vertices;
+	vector<Edge> edges; // For n >= 3 sites, up to 3 * n - 6 edges, so up to 6 * n - 12 half-edges.
+	vector<Vertex> vertices; // For n >= 3 sites, up to 2 * n - 5 vertices.
 	vector<Face> faces;
 };
 
@@ -719,6 +719,8 @@ DoublyConnectedEdgeList fortune(const vector<Point>& sites)
 {
 	auto dcel = DoublyConnectedEdgeList{};
 
+	dcel.edges.reserve(sites.size() >= 3 ? 6 * sites.size() - 12 : (sites.size() == 2 ? 2 : 0));
+	dcel.vertices.reserve(sites.size() >= 3 ? 2 * sites.size() - 5 : 0);
 	dcel.faces.resize(sites.size());
 
 	auto queue = PriorityQueue{ sites };
