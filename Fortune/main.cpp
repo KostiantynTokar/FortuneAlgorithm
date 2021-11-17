@@ -29,24 +29,14 @@ bool isCloseToZero(double a, double maxAbsDiff = 1e-10)
 	return isClose(a, 0.0, 0.0, maxAbsDiff);
 }
 
-bool approximatelyEqual(double a, double b, double epsilon = numeric_limits<double>::epsilon())
-{
-	return abs(a - b) <= ((abs(a) < abs(b) ? abs(b) : abs(a)) * epsilon);
-}
-
-bool essentiallyEqual(double a, double b, double epsilon = numeric_limits<double>::epsilon())
-{
-	return abs(a - b) <= ((abs(a) > abs(b) ? abs(b) : abs(a)) * epsilon);
-}
-
 bool definitelyGreaterThan(double a, double b, double epsilon = numeric_limits<double>::epsilon())
 {
-	return (a - b) > ((abs(a) < abs(b) ? abs(b) : abs(a)) * epsilon);
+	return (a - b) > (max(abs(a), abs(b)) * epsilon);
 }
 
 bool definitelyLessThan(double a, double b, double epsilon = numeric_limits<double>::epsilon())
 {
-	return (b - a) > ((abs(a) < abs(b) ? abs(b) : abs(a)) * epsilon);
+	return (b - a) > (max(abs(a), abs(b)) * epsilon);
 }
 
 struct Point
@@ -90,15 +80,8 @@ void addEdge(DoublyConnectedEdgeList& dcel, const size_t s1, const size_t s2)
 	dcel.faces[s2] = { .edge = dcel.edges.size() - 1 };
 }
 
-enum class ParabolasIntersectionDirection
-{
-	left,
-	right,
-	down
-};
-
-// Returns x-coordinate of an intersection of the arc1 from the left and arc2 from the right and whether it is left intersection (with lower x).
-tuple<double, ParabolasIntersectionDirection> parabolasIntersectionX(const double sweepLineY, const Point& site1, const Point& site2)
+// Returns x-coordinate of an intersection of the arc1 from the left and arc2 from the right.
+double parabolasIntersectionX(const double sweepLineY, const Point& site1, const Point& site2)
 {
 	const auto sx1 = site1.x;
 	const auto sx2 = site2.x;
@@ -106,7 +89,7 @@ tuple<double, ParabolasIntersectionDirection> parabolasIntersectionX(const doubl
 	const auto sy2 = site2.y;
 	if (isClose(sy1, sy2))
 	{
-		return make_tuple((sx1 + sx2) / 2, ParabolasIntersectionDirection::down);
+		return (sx1 + sx2) / 2;
 	}
 	const auto p1 = site1.y - sweepLineY;
 	const auto p2 = site2.y - sweepLineY;
@@ -119,15 +102,8 @@ tuple<double, ParabolasIntersectionDirection> parabolasIntersectionX(const doubl
 	const auto Dsqr = p1 * p2 * (sxDiff * sxDiff + pDiff * pDiff);
 	const auto D = Dsqr > 0.0 ? sqrt(Dsqr) : 0.0;
 	return (changeSign ? sy1 < sy2 : sy1 > sy2)
-		? make_tuple((mb - D) / pDiff, changeSign ? ParabolasIntersectionDirection::right : ParabolasIntersectionDirection::left)
-		: make_tuple((mb + D) / pDiff, changeSign ? ParabolasIntersectionDirection::left : ParabolasIntersectionDirection::right);
-}
-
-double parabolaY(const double sweepLineY, const Point& site, const double x)
-{
-	const auto p = site.y - sweepLineY;
-	assert(!isCloseToZero(p));
-	return x * x / (2 * p) - (site.x * x) / p + (site.x * site.x) / (2 * p) + p / 2 + sweepLineY;
+		? (mb - D) / pDiff
+		: (mb + D) / pDiff;
 }
 
 struct BeachLine
@@ -231,7 +207,7 @@ struct BeachLine
 		if (node->isLeaf())
 			return node;
 
-		const auto intersectionX = get<0>(parabolasIntersectionX(sweepLinePos, sites[node->p], sites[node->q]));
+		const auto intersectionX = parabolasIntersectionX(sweepLinePos, sites[node->p], sites[node->q]);
 
 		// If intersection's x-coordinate equals to site's x-coordinate, then new circle event will be created and instantly processed
 		// (piece of left arc with is created and removed instantly).
