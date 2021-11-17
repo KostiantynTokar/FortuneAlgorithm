@@ -837,7 +837,8 @@ DoublyConnectedEdgeList fortune(const vector<Point>& sites)
 			
 			setVertexFrom(leftIntersectionHalfEdge, s1);
 			setVertexFrom(rightIntersectionHalfEdge, bads);
-			setVertexFrom(intersectionHalfEdge, s2);
+			assert(dcel.halfEdges[intersectionHalfEdge + 1].face == s2);
+			dcel.halfEdges[intersectionHalfEdge + 1].vertexFrom = dcel.vertices.size();
 
 			dcel.vertices.push_back({
 				.p = ev.center,
