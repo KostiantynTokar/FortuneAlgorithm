@@ -117,7 +117,7 @@ struct BeachLine
 		Node* right;
 		size_t p; // For intersections: site that defines left arc. For leaves: site that defines the arc.
 		size_t q; // For intersections: site that defines right arc. 
-		ptrdiff_t halfEdge = -1; // For intersections: index of an edge that is built from this intersection.
+		ptrdiff_t halfEdge = -1; // For intersections: index of a half-edge (one of two twins) that is built from this intersection.
 		ptrdiff_t circleEventId; // -1 if no circle event that is connected to this leaf.
 		signed char balance; // Difference in height between right subtree and left subtree.
 
@@ -811,14 +811,14 @@ DoublyConnectedEdgeList fortune(const vector<Point>& sites)
 			assert(rightIntersection->halfEdge != -1);
 
 			const auto bads = arcToRemove->p;
-			const auto leftIntersectionEdgepq = leftIntersection->halfEdge;
-			const auto rightIntersectionEdgepq = rightIntersection->halfEdge;
+			const auto leftIntersectionHalfEdge = leftIntersection->halfEdge;
+			const auto rightIntersectionHalfEdge = rightIntersection->halfEdge;
 			const auto intersection = beachLine.removeArc(arcToRemove);
 
 			const auto s1 = left->p;
 			const auto s2 = right->p;
 
-			const auto intersectionEdgepq = intersection->halfEdge = dcel.halfEdges.size();
+			const auto intersectionHalfEdge = intersection->halfEdge = dcel.halfEdges.size();
 
 			dcel.halfEdges.push_back({ .face = s1 });
 			dcel.halfEdges.push_back({ .face = s2 });
@@ -835,30 +835,31 @@ DoublyConnectedEdgeList fortune(const vector<Point>& sites)
 				}
 			};
 			
-			setVertexFrom(leftIntersectionEdgepq, s1);
-			setVertexFrom(rightIntersectionEdgepq, bads);
-			setVertexFrom(intersectionEdgepq, s2);
+			setVertexFrom(leftIntersectionHalfEdge, s1);
+			setVertexFrom(rightIntersectionHalfEdge, bads);
+			setVertexFrom(intersectionHalfEdge, s2);
 
 			dcel.vertices.push_back({
 				.p = ev.center,
-				.halfEdge = static_cast<size_t>(intersectionEdgepq + 1)
+				.halfEdge = static_cast<size_t>(intersectionHalfEdge + 1)
 			});
 
-			const auto setNext = [&halfEdges = dcel.halfEdges](const ptrdiff_t centralEdgepq, const ptrdiff_t leftEdgepq, const ptrdiff_t rightEdgepq, const size_t sLeft, const size_t sRight)
+			const auto setNext = [&halfEdges = dcel.halfEdges]
+			(const ptrdiff_t centralHalfEdge, const ptrdiff_t leftHalfEdge, const ptrdiff_t rightHalfEdge, const size_t sLeft, const size_t sRight)
 			{
-				if (halfEdges[centralEdgepq].face == sLeft)
+				if (halfEdges[centralHalfEdge].face == sLeft)
 				{
-					halfEdges[centralEdgepq].next = halfEdges[leftEdgepq].face == sLeft ? leftEdgepq : leftEdgepq + 1;
+					halfEdges[centralHalfEdge].next = halfEdges[leftHalfEdge].face == sLeft ? leftHalfEdge : leftHalfEdge + 1;
 				}
 				else
 				{
-					halfEdges[centralEdgepq + 1].next = halfEdges[leftEdgepq].face == sLeft ? leftEdgepq : leftEdgepq + 1;
+					halfEdges[centralHalfEdge + 1].next = halfEdges[leftHalfEdge].face == sLeft ? leftHalfEdge : leftHalfEdge + 1;
 				}
 			};
 
-			setNext(intersectionEdgepq, leftIntersectionEdgepq, rightIntersectionEdgepq, s1, s2);
-			setNext(leftIntersectionEdgepq, rightIntersectionEdgepq, intersectionEdgepq, bads, s1);
-			setNext(rightIntersectionEdgepq, intersectionEdgepq, leftIntersectionEdgepq, s2, bads);
+			setNext(intersectionHalfEdge, leftIntersectionHalfEdge, rightIntersectionHalfEdge, s1, s2);
+			setNext(leftIntersectionHalfEdge, rightIntersectionHalfEdge, intersectionHalfEdge, bads, s1);
+			setNext(rightIntersectionHalfEdge, intersectionHalfEdge, leftIntersectionHalfEdge, s2, bads);
 
 			createCircleEvents(ev.y, left, intersection, right, left, intersection, right);
 		}
