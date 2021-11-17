@@ -709,10 +709,10 @@ tuple<double, Point> circleBottomPoint(const Point& a, const Point& b, const Poi
 	return make_tuple(yc - r, Point{ xc, yc });
 }
 
-bool isConvergent(const double y, const Point& siteLeft, const Point& siteCenter, const Point& siteRight)
+bool isConvergent(const double y, const Point& siteLeft, const Point& siteCentral, const Point& siteRight)
 {
 	// True if triangle if left-oriented.
-	return definitelyLessThan((siteCenter.x - siteLeft.x) * (siteRight.y - siteLeft.y) - (siteCenter.y - siteLeft.y) * (siteRight.x - siteLeft.x), 0);
+	return definitelyLessThan((siteCentral.x - siteLeft.x) * (siteRight.y - siteLeft.y) - (siteCentral.y - siteLeft.y) * (siteRight.x - siteLeft.x), 0);
 }
 
 DoublyConnectedEdgeList fortune(const vector<Point>& sites)
@@ -810,18 +810,18 @@ DoublyConnectedEdgeList fortune(const vector<Point>& sites)
 			assert(leftIntersection->halfEdge != -1);
 			assert(rightIntersection->halfEdge != -1);
 
-			const auto bads = arcToRemove->p;
+			const auto sCentral = arcToRemove->p;
 			const auto leftIntersectionHalfEdge = leftIntersection->halfEdge;
 			const auto rightIntersectionHalfEdge = rightIntersection->halfEdge;
 			const auto intersection = beachLine.removeArc(arcToRemove);
 
-			const auto s1 = left->p;
-			const auto s2 = right->p;
+			const auto sLeft = left->p;
+			const auto sRight = right->p;
 
 			const auto intersectionHalfEdge = intersection->halfEdge = dcel.halfEdges.size();
 
-			dcel.halfEdges.push_back({ .face = s1 });
-			dcel.halfEdges.push_back({ .face = s2 });
+			dcel.halfEdges.push_back({ .face = sLeft });
+			dcel.halfEdges.push_back({ .face = sRight });
 
 			const auto setVertexFrom = [&dcel](const ptrdiff_t edgeInd, const size_t s)
 			{
@@ -835,9 +835,9 @@ DoublyConnectedEdgeList fortune(const vector<Point>& sites)
 				}
 			};
 			
-			setVertexFrom(leftIntersectionHalfEdge, s1);
-			setVertexFrom(rightIntersectionHalfEdge, bads);
-			assert(dcel.halfEdges[intersectionHalfEdge + 1].face == s2);
+			setVertexFrom(leftIntersectionHalfEdge, sLeft);
+			setVertexFrom(rightIntersectionHalfEdge, sCentral);
+			assert(dcel.halfEdges[intersectionHalfEdge + 1].face == sRight);
 			dcel.halfEdges[intersectionHalfEdge + 1].vertexFrom = dcel.vertices.size();
 
 			dcel.vertices.push_back({
@@ -858,9 +858,9 @@ DoublyConnectedEdgeList fortune(const vector<Point>& sites)
 				}
 			};
 
-			setNext(intersectionHalfEdge, leftIntersectionHalfEdge, rightIntersectionHalfEdge, s1, s2);
-			setNext(leftIntersectionHalfEdge, rightIntersectionHalfEdge, intersectionHalfEdge, bads, s1);
-			setNext(rightIntersectionHalfEdge, intersectionHalfEdge, leftIntersectionHalfEdge, s2, bads);
+			setNext(intersectionHalfEdge, leftIntersectionHalfEdge, rightIntersectionHalfEdge, sLeft, sRight);
+			setNext(leftIntersectionHalfEdge, rightIntersectionHalfEdge, intersectionHalfEdge, sCentral, sLeft);
+			setNext(rightIntersectionHalfEdge, intersectionHalfEdge, leftIntersectionHalfEdge, sRight, sCentral);
 
 			createCircleEvents(ev.y, left, intersection, right, left, intersection, right);
 		}
@@ -1008,9 +1008,9 @@ int main()
 				const auto eTwinNextInd = vor.halfEdges[eTwinInd].next;
 				const auto eTwinNextTwinInd = eTwinNextInd % 2 == 0 ? eTwinNextInd + 1 : eTwinNextInd - 1;
 				const auto ePrevTwinInd = vor.halfEdges[eTwinNextTwinInd].next;
-				// bads - site opposite to the ray, sOpposite.
-				const auto bads = vor.halfEdges[ePrevTwinInd].face;
-				assert(s1 != bads && s2 != bads);
+				// sOpposite - site opposite to the ray.
+				const auto sOpposite = vor.halfEdges[ePrevTwinInd].face;
+				assert(s1 != sOpposite && s2 != sOpposite);
 
 				infEdgeXs[infEdgeCounter] = vor.vertices[e.vertexFrom].p.x;
 				infEdgeYs[infEdgeCounter] = vor.vertices[e.vertexFrom].p.y;
@@ -1018,20 +1018,20 @@ int main()
 				if (isCloseToZero(a))
 				{
 					infEdgeXs[infEdgeCounter + infEdgeCount] = -c / b;
-					infEdgeYs[infEdgeCounter + infEdgeCount] = sites[bads].y < sites[s1].y ? drawMaxY : drawMinY;
+					infEdgeYs[infEdgeCounter + infEdgeCount] = sites[sOpposite].y < sites[s1].y ? drawMaxY : drawMinY;
 				}
 				else
 				{
 					const auto isDirLeft = isClose(sites[s1].x, sites[s2].x)
-						? sites[s1].x < sites[bads].x
-						: [a, b, &s1 = sites[s1], &bads = sites[bads]]()
+						? sites[s1].x < sites[sOpposite].x
+						: [a, b, &s1 = sites[s1], &sOpposite = sites[sOpposite]]()
 					{
 						const auto perpA = -b;
 						const auto perpB = a;
 						const auto perpC = -perpA * s1.y - perpB * s1.x;
-						const auto distToBads = perpA * bads.y + perpB * bads.x + perpC;
+						const auto distToOpposite = perpA * sOpposite.y + perpB * sOpposite.x + perpC;
 						const auto distToPointToRight = perpA * s1.y + perpB * (s1.x + 1) + perpC;
-						return distToPointToRight * distToBads > 0;
+						return distToPointToRight * distToOpposite > 0;
 					}();
 
 					infEdgeXs[infEdgeCounter + infEdgeCount] = isDirLeft ? drawMinX : drawMaxX;
