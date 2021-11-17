@@ -237,8 +237,8 @@ struct BeachLine
 		auto newSubTree = new Node{ .parent = regionNodeParent, .left = nullptr, .right = nullptr, .p = intersectedArc, .q = site, .circleEventId = -1, .balance = 0 };
 		newSubTree->left = regionNode;
 		newSubTree->left->parent = newSubTree;
-		newSubTree->left->halfEdge = -1;
 		newSubTree->left->circleEventId = -1;
+		assert(newSubTree->left->halfEdge == -1);
 		newSubTree->right = new Node{ .parent = newSubTree, .left = nullptr, .right = nullptr, .p = site, .q = intersectedArc, .circleEventId = -1, .balance = 0 };
 		const auto redLeaf = newSubTree->right; // Rebalance, then add to this node 2 children.
 
