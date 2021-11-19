@@ -846,7 +846,7 @@ DoublyConnectedEdgeList fortune(const vector<Point>& sites)
 			});
 
 			const auto setNext = [&halfEdges = dcel.halfEdges]
-			(const ptrdiff_t centralHalfEdge, const ptrdiff_t leftHalfEdge, const ptrdiff_t rightHalfEdge, const size_t sLeft, const size_t sRight)
+			(const ptrdiff_t centralHalfEdge, const ptrdiff_t leftHalfEdge, const size_t sLeft)
 			{
 				if (halfEdges[centralHalfEdge].face == sLeft)
 				{
@@ -858,9 +858,9 @@ DoublyConnectedEdgeList fortune(const vector<Point>& sites)
 				}
 			};
 
-			setNext(intersectionHalfEdge, leftIntersectionHalfEdge, rightIntersectionHalfEdge, sLeft, sRight);
-			setNext(leftIntersectionHalfEdge, rightIntersectionHalfEdge, intersectionHalfEdge, sCentral, sLeft);
-			setNext(rightIntersectionHalfEdge, intersectionHalfEdge, leftIntersectionHalfEdge, sRight, sCentral);
+			setNext(intersectionHalfEdge, leftIntersectionHalfEdge, sLeft);
+			setNext(leftIntersectionHalfEdge, rightIntersectionHalfEdge, sCentral);
+			setNext(rightIntersectionHalfEdge, intersectionHalfEdge, sRight);
 
 			createCircleEvents(ev.y, left, intersection, right, left, intersection, right);
 		}
