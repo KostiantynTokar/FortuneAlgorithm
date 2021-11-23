@@ -72,12 +72,22 @@ struct DoublyConnectedEdgeList
 	vector<Face> faces;
 };
 
-void addEdge(DoublyConnectedEdgeList& dcel, const size_t s1, const size_t s2)
+// Creates two half-edges. Returns index of the first of the two created half-edges.
+size_t createBisectorForProcessedSites(DoublyConnectedEdgeList& dcel, const size_t s1, const size_t s2)
 {
-	dcel.faces[s1] = { .halfEdge = dcel.halfEdges.size() };
-	dcel.faces[s2] = { .halfEdge = dcel.halfEdges.size() + 1 };
+	const auto res = dcel.halfEdges.size();
 	dcel.halfEdges.push_back({ .face = s1 });
 	dcel.halfEdges.push_back({ .face = s2 });
+	return res;
+}
+
+// Creates two half-edges and two faces. Returns index of the first of the two created half-edges.
+size_t createBisectorForNewSites(DoublyConnectedEdgeList& dcel, const size_t s1, const size_t s2)
+{
+	const auto res = createBisectorForProcessedSites(dcel, s1, s2);
+	dcel.faces[s1] = { .halfEdge = res };
+	dcel.faces[s2] = { .halfEdge = res + 1 };
+	return res;
 }
 
 // Returns x-coordinate of an intersection of the arc1 from the left and arc2 from the right.
@@ -186,13 +196,12 @@ struct BeachLine
 			.left = init(begin, std::next(begin, mid), dcel),
 			.right = init(std::next(begin, mid), end, dcel),
 			.p = s1, .q = s2,
-			.halfEdge = static_cast<ptrdiff_t>(dcel.halfEdges.size()),
+			.halfEdge = static_cast<ptrdiff_t>(createBisectorForNewSites(dcel, s1, s2)),
 			.circleEventId = -1,
 			.balance = static_cast<signed char>(mid * 2 == dist ? 0 : 1)
 		};
 		n->left->parent = n;
 		n->right->parent = n;
-		addEdge(dcel, s1, s2);
 		return n;
 	}
 
@@ -781,8 +790,7 @@ DoublyConnectedEdgeList fortune(const vector<Point>& sites)
 			assert(left->p == right->p);
 			assert(left->p == leftCentral->p && central->p == leftCentral->q);
 			assert(central->p == centralRight->p && right->p == centralRight->q);
-			centralRight->halfEdge = leftCentral->halfEdge = dcel.halfEdges.size();
-			addEdge(dcel, central->p, left->p);
+			centralRight->halfEdge = leftCentral->halfEdge = createBisectorForNewSites(dcel, central->p, left->p);
 			createCircleEvents(ev.y, left, leftCentral, central, central, centralRight, right);
 		}
 		break; case Event::Type::circle:
@@ -818,10 +826,7 @@ DoublyConnectedEdgeList fortune(const vector<Point>& sites)
 			const auto sLeft = left->p;
 			const auto sRight = right->p;
 
-			const auto intersectionHalfEdge = intersection->halfEdge = dcel.halfEdges.size();
-
-			dcel.halfEdges.push_back({ .face = sLeft });
-			dcel.halfEdges.push_back({ .face = sRight });
+			const auto intersectionHalfEdge = intersection->halfEdge = createBisectorForProcessedSites(dcel, sLeft, sRight);
 
 			const auto setVertexFrom = [&dcel](const ptrdiff_t edgeInd, const size_t s)
 			{
