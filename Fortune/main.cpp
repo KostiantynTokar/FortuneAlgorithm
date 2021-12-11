@@ -187,8 +187,6 @@ struct BeachLine
 
 	constexpr void insertArcWithTheSameY(const size_t site)
 	{
-		assert(!empty());
-
 		const auto regionNode = findRegionByX(site);
 
 		const auto newLeaf = new Node{
@@ -281,7 +279,6 @@ struct BeachLine
 
 	constexpr NewArcInfo insertArc(const size_t site)
 	{
-		assert(!empty());
 		auto regionNode = findRegion(site);
 		const auto intersectedArc = regionNode->p;
 		const auto eventId = regionNode->circleEventId;
@@ -448,24 +445,19 @@ struct BeachLine
 		return node;
 	}
 
-	/*constexpr static Node* findLeafToLeft(Node* node)
-	{
-		assert(node->isLeaf());
-		const auto [intersection, _] = findIntersectionWithLeftLeaf(node);
-		return findLeafToLeftFromIntersection(intersection);
-	}
+	//constexpr static Node* findLeafToLeft(Node* node)
+	//{
+	//	assert(node->isLeaf());
+	//	const auto [intersection, _] = findIntersectionWithLeftLeaf(node);
+	//	return findLeafToLeftFromIntersection(intersection);
+	//}
 
-	constexpr static Node* findLeafToRight(Node* node)
-	{
-		assert(node->isLeaf());
-		const auto [intersection, _] = findIntersectionWithRightLeaf(node);
-		return findLeafToRightFromIntersection(intersection);
-	}*/
-
-	constexpr bool empty() const
-	{
-		return root == nullptr;
-	}
+	//constexpr static Node* findLeafToRight(Node* node)
+	//{
+	//	assert(node->isLeaf());
+	//	const auto [intersection, _] = findIntersectionWithRightLeaf(node);
+	//	return findLeafToRightFromIntersection(intersection);
+	//}
 
 	constexpr void rebalanceSubTree(Node*& node, Node* parent)
 	{
