@@ -230,21 +230,7 @@ struct BeachLine
 		auto child = newIntersection;
 		auto parent = newIntersection->parent;
 		replaceNode(regionNode, child, parent);
-
-		if (parent != nullptr)
-		{
-			do
-			{
-				if (parent->left == child)
-					--parent->balance;
-				else
-					++parent->balance;
-				assert(-2 <= parent->balance && parent->balance <= 2);
-				child = parent;
-				parent = parent->parent;
-				rebalanceSubTree(child, parent);
-			} while (parent != nullptr && child->balance != 0);
-		}
+		rebalanceTreeAfterInsertion(child, parent);
 	}
 
 	constexpr Node* findRegion(const size_t site) const
@@ -300,22 +286,7 @@ struct BeachLine
 		};
 		
 		replaceNode(regionNode, newSubTree, regionNodeParent);
-
-		auto child = newSubTree;
-		if (regionNodeParent != nullptr)
-		{
-			do
-			{
-				if (regionNodeParent->left == child)
-					--regionNodeParent->balance;
-				else
-					++regionNodeParent->balance;
-				assert(-2 <= regionNodeParent->balance && regionNodeParent->balance <= 2);
-				child = regionNodeParent;
-				regionNodeParent = regionNodeParent->parent;
-				rebalanceSubTree(child, regionNodeParent);
-			} while (regionNodeParent != nullptr && child->balance != 0);
-		}
+		rebalanceTreeAfterInsertion(newSubTree, regionNodeParent);
 
 		redLeaf->left = new Node{ .parent = redLeaf, .left = nullptr, .right = nullptr, .p = site, .q = 0, .circleEventId = -1, .balance = 0 };
 		redLeaf->right = new Node{ .parent = redLeaf, .left = nullptr, .right = nullptr, .p = intersectedArc, .q = 0, .circleEventId = -1, .balance = 0 };
@@ -323,22 +294,7 @@ struct BeachLine
 		res.central = redLeaf->left;
 		res.right = redLeaf->right;
 
-		child = redLeaf;
-		regionNodeParent = child->parent;
-		if (regionNodeParent != nullptr)
-		{
-			do
-			{
-				if (regionNodeParent->left == child)
-					--regionNodeParent->balance;
-				else
-					++regionNodeParent->balance;
-				assert(-2 <= regionNodeParent->balance && regionNodeParent->balance <= 2);
-				child = regionNodeParent;
-				regionNodeParent = regionNodeParent->parent;
-				rebalanceSubTree(child, regionNodeParent);
-			} while (regionNodeParent != nullptr && child->balance != 0);
-		}
+		rebalanceTreeAfterInsertion(redLeaf, redLeaf->parent);
 
 		return res;
 	}
@@ -458,6 +414,24 @@ struct BeachLine
 	//	const auto [intersection, _] = findIntersectionWithRightLeaf(node);
 	//	return findLeafToRightFromIntersection(intersection);
 	//}
+
+	constexpr void rebalanceTreeAfterInsertion(Node* child, Node* parent)
+	{
+		if (parent != nullptr)
+		{
+			do
+			{
+				if (parent->left == child)
+					--parent->balance;
+				else
+					++parent->balance;
+				assert(-2 <= parent->balance && parent->balance <= 2);
+				child = parent;
+				parent = parent->parent;
+				rebalanceSubTree(child, parent);
+			} while (parent != nullptr && child->balance != 0);
+		}
+	}
 
 	constexpr void rebalanceSubTree(Node*& node, Node* parent)
 	{
