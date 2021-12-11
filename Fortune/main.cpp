@@ -160,18 +160,10 @@ struct BeachLine
 	Node* root;
 	const std::vector<Point>& sites;
 
-	constexpr BeachLine(const std::vector<Point>& sites, std::vector<size_t> sitesWithTheBiggestY, DoublyConnectedEdgeList& dcel)
+	constexpr BeachLine(const std::vector<Point>& sites, const size_t firstSite)
 		: sites{ sites }
-		, root{ nullptr }
+		, root{ new Node{.parent = nullptr, .left = nullptr, .right = nullptr, .p = firstSite, .q = 0, .circleEventId = -1, .balance = 0} }
 	{
-		assert(sitesWithTheBiggestY.size() >= 1);
-		std::sort(
-			std::begin(sitesWithTheBiggestY), std::end(sitesWithTheBiggestY),
-			[&sites](const size_t lhs, const size_t rhs)
-			{
-				return sites[lhs].x < sites[rhs].x;
-			});
-		root = init(std::cbegin(sitesWithTheBiggestY), std::cend(sitesWithTheBiggestY), dcel);
 	}
 
 	~BeachLine()
@@ -179,30 +171,82 @@ struct BeachLine
 		deleteRecursive(root);
 	}
 
-	template<typename It>
-	constexpr Node* init(It begin, It end, DoublyConnectedEdgeList& dcel)
+	constexpr Node* findRegionByX(const size_t site) const
 	{
-		assert(begin != end);
-		const auto dist = std::distance(begin, end);
-		if (dist == 1)
-		{
-			return new Node{ .parent = nullptr, .left = nullptr, .right = nullptr, .p = *begin, .q = 0, .circleEventId = -1, .balance = 0 };
-		}
-		const auto mid = dist / 2;
-		const auto s1 = *std::next(begin, mid - 1);
-		const auto s2 = *std::next(begin, mid);
-		const auto n = new Node{
+		return findRegionByXFrom(root, site);
+	}
+
+	constexpr Node* findRegionByXFrom(Node* node, const size_t site) const
+	{
+		assert(node != nullptr);
+		if (node->isLeaf())
+			return node;
+
+		return findRegionByXFrom(sites[site].x < sites[node->p].x ? node->left : node->right, site);
+	}
+
+	constexpr void insertArcWithTheSameY(const size_t site)
+	{
+		assert(!empty());
+
+		const auto regionNode = findRegionByX(site);
+
+		const auto newLeaf = new Node{
 			.parent = nullptr,
-			.left = init(begin, std::next(begin, mid), dcel),
-			.right = init(std::next(begin, mid), end, dcel),
-			.p = s1, .q = s2,
-			.halfEdge = static_cast<ptrdiff_t>(createBisectorForNewSites(dcel, s1, s2)),
+			.left = nullptr,
+			.right = nullptr,
+			.p = site, .q = 0,
 			.circleEventId = -1,
-			.balance = static_cast<signed char>(mid * 2 == dist ? 0 : 1)
+			.balance = 0
 		};
-		n->left->parent = n;
-		n->right->parent = n;
-		return n;
+
+		const auto [leftLeaf, rightLeaf] = sites[regionNode->p].x < sites[newLeaf->p].x ? tuple(regionNode, newLeaf) : tuple(newLeaf, regionNode);
+
+		if (regionNode->parent != nullptr)
+		{
+			if (newLeaf == leftLeaf)
+			{
+				const auto regionNodeLeftIntersection = get<0>(findIntersectionWithLeftLeaf(regionNode));
+				if(regionNodeLeftIntersection != nullptr)
+					regionNodeLeftIntersection->q = site;
+			}
+			else
+			{
+				const auto regionNodeRightIntersection = get<0>(findIntersectionWithRightLeaf(regionNode));
+				if(regionNodeRightIntersection != nullptr)
+					regionNodeRightIntersection->p = site;
+			}
+		}
+
+		const auto newIntersection = new Node{
+			.parent = regionNode->parent,
+			.left = leftLeaf,
+			.right = rightLeaf,
+			.p = leftLeaf->p, .q = rightLeaf->p,
+			.circleEventId = -1,
+			.balance = 0
+		};
+		leftLeaf->parent = newIntersection;
+		rightLeaf->parent = newIntersection;
+
+		auto child = newIntersection;
+		auto parent = newIntersection->parent;
+		replaceNode(regionNode, child, parent);
+
+		if (parent != nullptr)
+		{
+			do
+			{
+				if (parent->left == child)
+					--parent->balance;
+				else
+					++parent->balance;
+				assert(-2 <= parent->balance && parent->balance <= 2);
+				child = parent;
+				parent = parent->parent;
+				rebalanceSubTree(child, parent);
+			} while (parent != nullptr && child->balance != 0);
+		}
 	}
 
 	constexpr Node* findRegion(const size_t site) const
@@ -375,7 +419,7 @@ struct BeachLine
 		{
 			node = node->parent;
 			++height;
-			// This check is not necessary in insertArc.
+			// This check is not necessary in insertArc but necessary in insertArcWithTheSameY.
 			if (node == nullptr)
 				return make_tuple(nullptr, 0);
 		}
@@ -724,6 +768,17 @@ bool isConvergent(const double y, const Point& siteLeft, const Point& siteCentra
 	return definitelyLessThan((siteCentral.x - siteLeft.x) * (siteRight.y - siteLeft.y) - (siteCentral.y - siteLeft.y) * (siteRight.x - siteLeft.x), 0);
 }
 
+constexpr void recursiveCreateBisectorForNewSites(DoublyConnectedEdgeList& dcel, BeachLine::Node* node)
+{
+	assert(node != nullptr);
+	if (!node->isLeaf())
+	{
+		node->halfEdge = createBisectorForNewSites(dcel, node->p, node->q);
+		recursiveCreateBisectorForNewSites(dcel, node->left);
+		recursiveCreateBisectorForNewSites(dcel, node->right);
+	}
+}
+
 DoublyConnectedEdgeList fortune(const vector<Point>& sites)
 {
 	auto dcel = DoublyConnectedEdgeList{};
@@ -739,13 +794,14 @@ DoublyConnectedEdgeList fortune(const vector<Point>& sites)
 		return dcel;
 	}
 
-	auto sitesWithTheBiggestY = vector<size_t>{};
-	do
+	const auto topSite = get<1>(queue.pop());
+	const auto topSiteY = sites[topSite].y;
+	auto beachLine = BeachLine{ sites, topSite };
+	while (!queue.empty() && isClose(queue.storage[0].y, topSiteY))
 	{
-		sitesWithTheBiggestY.push_back(get<1>(queue.pop()));
-	} while (!queue.empty() && isClose(queue.storage[0].y, sites[sitesWithTheBiggestY.back()].y));
-	
-	auto beachLine = BeachLine{ sites, std::move(sitesWithTheBiggestY), dcel };
+		beachLine.insertArcWithTheSameY(get<1>(queue.pop()));
+	}
+	recursiveCreateBisectorForNewSites(dcel, beachLine.root);
 
 	const auto createCircleEvents = [&sites, &queue, &beachLine]
 	(const double y,
